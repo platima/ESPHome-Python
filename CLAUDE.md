@@ -55,6 +55,7 @@ CLI client  —(Unix socket)—>  Daemon  —(persistent ESPHome API connections
 | `esphome-lights.py`         | CLI client (currently monolithic; being refactored)  |
 | `esphome-lightsd.py`        | Daemon (planned — persistent connections + socket)   |
 | `esphome-lightsd.service`   | systemd unit file (planned)                          |
+| `SKILL.md`                  | OpenClaw skill definition for chat-driven control    |
 | `.env`                      | Device config (one level up from script directory)   |
 | `CLAUDE.md`                 | AI assistant context (this file)                     |
 | `TODO.md`                   | Persistent task tracker across sessions              |
@@ -187,6 +188,49 @@ Unix socket at `/tmp/esphome-lights.sock` (configurable via
 {"ok": true, "result": "Turned ON"}
 {"ok": false, "error": "Device 'kitchen' not found"}
 ```
+
+## OpenClaw Integration
+
+This project is designed as an [OpenClaw](https://github.com/nicholasgriffintn/openclaw)
+skill.  OpenClaw is a self-hosted AI gateway that bridges messaging platforms
+(WhatsApp, Telegram, Discord, Slack, etc.) with AI agents.
+
+### How It Fits
+
+```
+User (WhatsApp/Telegram/etc.)
+  → OpenClaw Gateway
+    → Agent (with exec tool)
+      → esphome-lights.py --set living_room --on
+        → ESPHome device
+```
+
+- The `SKILL.md` at the repo root registers ESPHome Lights as an OpenClaw skill.
+- The OpenClaw agent reads the skill definition and uses its `exec` tool to run
+  CLI commands.
+- Natural-language requests like *"turn on the living room"* are translated to
+  the appropriate `esphome-lights.py` invocation automatically.
+- OpenClaw's cron system can schedule automated light control (e.g. lights on
+  at sunset).
+
+### Skill File
+
+`SKILL.md` uses the AgentSkills format (YAML frontmatter + Markdown
+instructions).  Key metadata fields:
+
+- `requires.bins` — binaries that must exist on `PATH`
+- `requires.env` — environment variables the skill depends on
+- `requires.config` — OpenClaw config keys that must be truthy
+
+### Installation
+
+Symlink or clone this repo into the OpenClaw skills directory:
+
+```bash
+ln -s /path/to/ESPHome-Python ~/.openclaw/skills/esphome-lights
+```
+
+Ensure `ESPHOME_LIGHTS_*` env vars are available to the agent.
 
 ## Current State
 
