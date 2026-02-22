@@ -33,9 +33,11 @@ CLI client  —(Unix socket)—>  Daemon  —(persistent ESPHome API connections
 - **Terminals:** PowerShell in VS Code; Debian WSL2 accessible if needed
 - **Deployment target:** Luckfox Pico (ARM Linux SBC), resource-constrained
 - **Python interpreter:** `/home/luckfox/venv/bin/python` (Python 3.11)
-  - System Python is 3.13 and is **NOT** compatible with `aioesphomeapi`
-    due to the noise protocol import. Never use system Python for anything
-    importing `aioesphomeapi`.
+  - System Python is 3.13.  As of `aioesphomeapi` v44.0.0 (Feb 2026),
+    Python 3.13 is officially supported with pre-built wheels.  Earlier
+    versions had a Cython/noise-module incompatibility on 3.13.  If the
+    target venv is upgraded to v44.0.0+, system Python 3.13 may be usable.
+    Until confirmed on the Luckfox Pico, continue using the 3.11 venv.
 
 ## Tech Stack
 
@@ -234,7 +236,7 @@ Ensure `ESPHOME_LIGHTS_*` env vars are available to the agent.
 
 ## Current State
 
-- **Version:** 0.0.2
+- **Version:** 0.0.4
 - **Status:** Working monolithic CLI script; daemon refactor planned.
 - The monolithic script works correctly but has a ~4.2 s per-invocation cost
   due to heavy imports and per-call connection setup.
@@ -247,10 +249,10 @@ Ensure `ESPHOME_LIGHTS_*` env vars are available to the agent.
   (Noise protocol handshake), sends one command, and disconnects.
 - **`--status` is slow:** Queries every device sequentially-ish per call;
   no state caching.
-- **Python 3.13 incompatible:** `aioesphomeapi` (tested v44.0.0) fails on
-  Python 3.13 with `ModuleNotFoundError: No module named 'noise'`.  The error
-  originates from the Cython-compiled `noise_encryption.pyx` in
-  `aioesphomeapi._frame_helper` — the compiled extension cannot resolve the
-  `noise` module even when `noiseprotocol` 0.3.1 is correctly installed.
-  Uninstalling the conflicting `noise` 1.2.2 package does not fix the issue.
-  Must use the Python 3.11 venv.
+- **Python 3.13 — now supported upstream:** `aioesphomeapi` v44.0.0
+  (Feb 2026) ships pre-built wheels for CPython 3.13 (and 3.14).  Earlier
+  versions failed on Python 3.13 with `ModuleNotFoundError: No module named
+  'noise'` from the Cython-compiled `noise_encryption` extension.  The fix
+  was incremental across multiple releases throughout 2025.  The project
+  currently uses the Python 3.11 venv on the Luckfox Pico; upgrading to
+  3.13 is now feasible but untested on the target hardware.
