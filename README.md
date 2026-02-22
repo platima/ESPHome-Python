@@ -5,7 +5,7 @@ native ESPHome API.  Designed as an
 [OpenClaw](https://github.com/nicholasgriffintn/openclaw) skill for
 voice/chat-driven home automation.
 
-**Version:** 0.0.1
+**Version:** 0.0.3
 
 ## Overview
 
@@ -35,7 +35,9 @@ CLI client  —(Unix socket)—>  Daemon  —(persistent ESPHome API connections
 ## Requirements
 
 - **Python 3.11** (system Python 3.13 is **not** compatible with
-  `aioesphomeapi` due to the Noise protocol import)
+  `aioesphomeapi` — v44.0.0 fails with `ModuleNotFoundError: No module named
+  'noise'` from the Cython-compiled `noise_encryption` extension, even with
+  `noiseprotocol` correctly installed)
 - **`aioesphomeapi`** — installed in the Python 3.11 virtual environment
 - ESPHome devices with the native API enabled and encryption keys configured
 
