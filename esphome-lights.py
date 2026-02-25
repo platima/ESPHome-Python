@@ -80,20 +80,33 @@ def send_command(request: dict, background: bool = False) -> dict | None:
 
 
 def format_list(result: dict):
-    """Print device list matching the original output format."""
-    print("Configured ESPHome lights:")
+    """Print device list with connection state and entity type."""
+    print("Configured ESPHome devices:")
     for name, info in sorted(result.items()):
         host = info.get("host", "?")
         port = info.get("port", "?")
         conn = info.get("connection", "unknown")
-        print(f"  {name:20} -> {host}:{port}  [{conn}]")
+        etype = info.get("entity_type") or "unknown"
+        print(f"  {name:20} -> {host}:{port}  [{conn}] ({etype})")
 
 
 def format_status(result: dict):
-    """Print device status matching the original output format."""
+    """Print device status with entity type and light details."""
     for name, info in sorted(result.items()):
         state = info.get("state", "unknown")
-        print(f"  {name:20} {state}")
+        etype = info.get("entity_type") or "unknown"
+        parts = [f"  {name:20} {state:4}  ({etype})"]
+
+        # Show brightness and RGB details for light entities
+        if etype == "light" and state == "ON":
+            brightness = info.get("brightness")
+            if brightness is not None:
+                parts.append(f"  brightness:{brightness}")
+            rgb = info.get("rgb")
+            if rgb:
+                parts.append(f"  rgb:{rgb}")
+
+        print("".join(parts))
 
 
 def main():

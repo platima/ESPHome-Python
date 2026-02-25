@@ -175,10 +175,16 @@ class DeviceManager:
             self._schedule_reconnect(name)
 
     def _resolve_entity(self, name: str, entities):
-        """Pick the best controllable entity (LightInfo > SwitchInfo)."""
+        """Pick the best controllable entity (LightInfo > SwitchInfo).
+
+        Prefer LightInfo for brightness/RGB support, fall back to
+        SwitchInfo for simple on/off devices (smart plugs, relays, etc.).
+        The special ``status_led`` entity is always skipped.
+        """
         control_key = None
         control_type = None
 
+        # Prefer LightInfo — supports brightness and RGB
         for entity in entities:
             cls = entity.__class__.__name__
             if cls == "LightInfo" and getattr(entity, "object_id", "") != "status_led":
@@ -187,6 +193,7 @@ class DeviceManager:
                 break
 
         if control_key is None:
+            # Fall back to SwitchInfo (smart plugs, relays, etc.)
             for entity in entities:
                 if entity.__class__.__name__ == "SwitchInfo":
                     control_key = entity.key
@@ -256,13 +263,15 @@ class DeviceManager:
     # -- command handling ----------------------------------------------------
 
     def handle_list(self) -> dict:
-        """Return configured devices with connection state."""
+        """Return configured devices with connection state and entity type."""
         result = {}
         for name, cfg in sorted(self._devices.items()):
+            entity = self._entity_info.get(name, {})
             result[name] = {
                 "host": cfg["host"],
                 "port": cfg["port"],
                 "connection": self._conn_state.get(name, "unknown"),
+                "entity_type": entity.get("type"),
             }
         return {"ok": True, "result": result}
 

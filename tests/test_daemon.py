@@ -145,11 +145,17 @@ class TestDeviceManagerList(unittest.TestCase):
     def test_list_returns_all_devices(self):
         mgr = _make_manager()
         mgr._conn_state = {"living_room": "connected", "bedroom": "disconnected"}
+        mgr._entity_info = {
+            "living_room": {"key": 1, "type": "light"},
+            "bedroom": {"key": 2, "type": "switch"},
+        }
         result = mgr.handle_list()
         self.assertTrue(result["ok"])
         self.assertIn("living_room", result["result"])
         self.assertIn("bedroom", result["result"])
         self.assertEqual(result["result"]["living_room"]["connection"], "connected")
+        self.assertEqual(result["result"]["living_room"]["entity_type"], "light")
+        self.assertEqual(result["result"]["bedroom"]["entity_type"], "switch")
 
     def test_list_empty(self):
         mgr = _make_manager(devices={})

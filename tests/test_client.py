@@ -85,7 +85,7 @@ class TestFormatList(unittest.TestCase):
 
     def test_format_list(self):
         data = {
-            "kitchen": {"host": "10.0.0.5", "port": 6053, "connection": "connected"},
+            "kitchen": {"host": "10.0.0.5", "port": 6053, "connection": "connected", "entity_type": "light"},
         }
         import io
         buf = io.StringIO()
@@ -95,6 +95,7 @@ class TestFormatList(unittest.TestCase):
         self.assertIn("kitchen", output)
         self.assertIn("10.0.0.5", output)
         self.assertIn("connected", output)
+        self.assertIn("light", output)
 
 
 class TestFormatStatus(unittest.TestCase):
@@ -102,8 +103,8 @@ class TestFormatStatus(unittest.TestCase):
 
     def test_format_status(self):
         data = {
-            "bedroom": {"state": "OFF", "connection": "connected"},
-            "living_room": {"state": "ON", "connection": "connected"},
+            "bedroom": {"state": "OFF", "connection": "connected", "entity_type": "switch"},
+            "living_room": {"state": "ON", "connection": "connected", "entity_type": "light", "brightness": 200, "rgb": "255,128,0"},
         }
         import io
         buf = io.StringIO()
@@ -112,8 +113,26 @@ class TestFormatStatus(unittest.TestCase):
         output = buf.getvalue()
         self.assertIn("bedroom", output)
         self.assertIn("OFF", output)
+        self.assertIn("switch", output)
         self.assertIn("living_room", output)
         self.assertIn("ON", output)
+        self.assertIn("light", output)
+        self.assertIn("brightness:200", output)
+        self.assertIn("rgb:255,128,0", output)
+
+    def test_format_status_off_light_no_details(self):
+        """When a light is OFF, brightness/RGB details are not shown."""
+        data = {
+            "hallway": {"state": "OFF", "entity_type": "light", "brightness": 0, "rgb": "0,0,0"},
+        }
+        import io
+        buf = io.StringIO()
+        with patch("sys.stdout", buf):
+            esphome_lights.format_status(data)
+        output = buf.getvalue()
+        self.assertIn("hallway", output)
+        self.assertIn("OFF", output)
+        self.assertNotIn("brightness", output)
 
 
 # ---------------------------------------------------------------------------
