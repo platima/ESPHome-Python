@@ -46,14 +46,33 @@ CLI client  —(Unix socket)—>  Daemon  —(persistent ESPHome API connections
 
 ## Installation
 
+The installer sets up a **user-level systemd service** (no sudo required). It
+will check for dependencies, create a config template, and optionally register
+the OpenClaw skill.
+
 ```bash
-# Clone the repository
+bash <(curl -fsSL https://raw.githubusercontent.com/platima/ESPHome-Python/main/install.sh)
+# or
+bash <(wget -qO- https://raw.githubusercontent.com/platima/ESPHome-Python/main/install.sh)
+```
+
+Or, if you have already cloned the repo:
+
+```bash
 git clone https://github.com/platima/ESPHome-Python.git
 cd ESPHome-Python
-
-# Ensure the venv has aioesphomeapi
-/home/luckfox/venv/bin/pip install aioesphomeapi
+bash install.sh
 ```
+
+The installer will:
+
+1. Refuse to run as root.
+2. Install scripts to `~/.local/lib/esphome-lights/` with symlinks in `~/.local/bin/`.
+3. Install `aioesphomeapi` (with the `noiseprotocol` fix applied automatically).
+4. Check for a config file and offer to create a template if none exists.
+5. Install and enable a systemd user service with the socket at `$XDG_RUNTIME_DIR/esphome-lights.sock`.
+6. Enable `loginctl linger` so the daemon starts at boot without requiring login.
+7. Detect `~/.openclaw` and offer to register the skill if OpenClaw is installed.
 
 ## Device Configuration
 
@@ -67,15 +86,24 @@ ESPHOME_LIGHTS_<LOCATION>="<host>:<port>|<encryption_key>"
 - **Location** is uppercased in the variable name and lowercased for CLI use.
 - **Port** is typically `6053` (native ESPHome API).
 
-### Example
+### Config file (installer)
 
-Set variables directly or place them in a `.env` file one directory above the
-script:
+When installed via `install.sh`, the config file lives at:
+
+```
+~/.config/esphome-lights/env
+```
+
+The installer creates a commented template here if no file is found.
+
+### Manual / environment variable
+
+You can also export variables in your shell or place a `.env` file one
+directory above the script:
 
 ```bash
-# In .env (or export in your shell)
-ESPHOME_LIGHTS_LIVING_ROOM="10.42.40.55:6053|J+YkHH7XC+4dQwWvPoF5kaz7tP4NY4HJNTL0QyZM1Rg="
-ESPHOME_LIGHTS_BEDROOM="10.42.40.56:6053|another_key_here"
+export ESPHOME_LIGHTS_LIVING_ROOM="10.42.40.55:6053|J+YkHH7XC+4dQwWvPoF5kaz7tP4NY4HJNTL0QyZM1Rg="
+export ESPHOME_LIGHTS_BEDROOM="10.42.40.56:6053|another_key_here="
 ```
 
 ## Usage
@@ -167,20 +195,24 @@ newline-delimited JSON.
 
 ### systemd
 
-A systemd unit file (`esphome-lightsd.service`) is provided for auto-starting
-the daemon on boot:
+The installer configures a **user-level** systemd service automatically. To
+manage it:
 
 ```bash
-sudo cp esphome-lightsd.service /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable --now esphome-lightsd
+# Start / stop / restart
+systemctl --user start esphome-lightsd
+systemctl --user stop esphome-lightsd
+systemctl --user restart esphome-lightsd
+
+# Check status
+systemctl --user status esphome-lightsd
+
+# View live logs
+journalctl --user -u esphome-lightsd -f
 ```
 
-To check daemon status:
-```bash
-sudo systemctl status esphome-lightsd
-sudo journalctl -u esphome-lightsd -f
-```
+A system-level unit file (`esphome-lightsd.service`) is also included in the
+repo for manual system-wide installs (requires root).
 
 ### Performance Targets
 
@@ -260,9 +292,10 @@ state caching, and client-daemon integration.
 
 ```
 ESPHome-Python/
+├── install.sh                  # One-line installer (user-level, no sudo)
 ├── esphome-lights.py           # Thin CLI client (stdlib only)
 ├── esphome-lightsd.py          # Daemon (persistent connections + socket)
-├── esphome-lightsd.service     # systemd unit file
+├── esphome-lightsd.service     # systemd unit file (system-level reference)
 ├── tests/
 │   ├── test_daemon.py          # Daemon unit tests (37 tests)
 │   └── test_client.py          # Client unit + integration tests (12 tests)

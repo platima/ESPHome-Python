@@ -1,7 +1,7 @@
 # CLAUDE.md — AI Assistant Context
 
 This file provides project context for AI coding assistants (GitHub Copilot,
-Claude, etc.).  It is read at the start of each session so the assistant
+Claude, etc.). It is read at the start of each session so the assistant
 understands the project without re-discovering everything.
 
 ## Project Overview
@@ -31,14 +31,14 @@ CLI client  —(Unix socket)—>  Daemon  —(persistent ESPHome API connections
 - **Terminals:** PowerShell in VS Code; Debian WSL2 accessible if needed
 - **Deployment target:** Luckfox Pico (ARM Linux SBC), resource-constrained
 - **Python interpreter:** System Python 3.13 confirmed working on the Luckfox
-  Pico with `aioesphomeapi` 44.0.0.  The legacy 3.11 venv is no longer required.
+  Pico with `aioesphomeapi` 44.0.0. The legacy 3.11 venv is no longer required.
   - **Install `noiseprotocol` in user space** — both `noise` 1.2.2 (Perlin
     noise) and `noiseprotocol` install into the same `noise/` directory.
     Uninstalling `noise` 1.2.2 deletes that directory, silently breaking
-    `noiseprotocol`.  Fix: `python3.13 -m pip install --force-reinstall noiseprotocol`.
+    `noiseprotocol`. Fix: `python3.13 -m pip install --force-reinstall noiseprotocol`.
   - The Cython-compiled `.so` files in the pre-built wheel still resolve
     `import noise` at runtime via Python's normal import system — there is no
-    static linking.  If the `noise/` directory is missing from `sys.path`, the
+    static linking. If the `noise/` directory is missing from `sys.path`, the
     import fails with `ModuleNotFoundError: No module named 'noise'`.
 
 ## Tech Stack
@@ -56,9 +56,10 @@ CLI client  —(Unix socket)—>  Daemon  —(persistent ESPHome API connections
 
 | File                        | Purpose                                              |
 |-----------------------------|------------------------------------------------------|
+| `install.sh`                | One-line user-level installer (no sudo)              |
 | `esphome-lights.py`         | Thin CLI client (stdlib only, fast startup)          |
 | `esphome-lightsd.py`        | Daemon (persistent connections + Unix socket)        |
-| `esphome-lightsd.service`   | systemd unit file for auto-starting the daemon       |
+| `esphome-lightsd.service`   | systemd unit file (system-level reference)           |
 | `tests/`                    | Unit tests (test_daemon.py, test_client.py)          |
 | `SKILL.md`                  | OpenClaw skill definition for chat-driven control    |
 | `.env`                      | Device config (one level up from script directory)   |
@@ -70,8 +71,7 @@ CLI client  —(Unix socket)—>  Daemon  —(persistent ESPHome API connections
 
 ## Device Configuration
 
-Devices are configured via environment variables (or a `.env` file loaded from
-one directory above the script):
+Devices are configured via environment variables.
 
 ```
 ESPHOME_LIGHTS_<LOCATION>="<host>:<port>|<encryption_key>"
@@ -79,6 +79,12 @@ ESPHOME_LIGHTS_<LOCATION>="<host>:<port>|<encryption_key>"
 
 - Location is lowercased for CLI use.
 - Port is typically `6053` (native ESPHome API).
+
+When installed via `install.sh`, config lives at `~/.config/esphome-lights/env`
+and is loaded by the systemd unit via `EnvironmentFile=`. For manual runs, the
+daemon also loads a `.env` file from one directory above the script as a
+fallback.
+
 - Example:
   ```
   ESPHOME_LIGHTS_LIVING_ROOM="10.42.40.55:6053|J+YkHH7XC+4dQwWvPoF5kaz7tP4NY4HJNTL0QyZM1Rg="
@@ -142,7 +148,7 @@ Semantic Versioning tracked in the `VERSION` file at the repo root.
 - **Create documentation if it's missing.** Never leave a new subsystem
   undocumented.
 - **Update `TODO.md`** when tasks are completed or new work is identified.
-  This file is the persistent plan — if a session is lost, the next session
+  This file is the persistent plan - if a session is lost, the next session
   picks up from `TODO.md`.
 
 ### Standard Task Completion Checklist
@@ -205,7 +211,7 @@ Unix socket at `/tmp/esphome-lights.sock` (configurable via
 ## OpenClaw Integration
 
 This project is designed as an [OpenClaw](https://github.com/openclaw/openclaw)
-skill.  OpenClaw is a self-hosted AI gateway that bridges messaging platforms
+skill. OpenClaw is a self-hosted AI gateway that bridges messaging platforms
 (WhatsApp, Telegram, Discord, Slack, etc.) with AI agents.
 
 ### How It Fits
@@ -229,15 +235,16 @@ User (WhatsApp/Telegram/etc.)
 ### Skill File
 
 `SKILL.md` uses the AgentSkills format (YAML frontmatter + Markdown
-instructions).  Key metadata fields:
+instructions). Key metadata fields:
 
-- `requires.bins` — binaries that must exist on `PATH`
-- `requires.env` — environment variables the skill depends on
-- `requires.config` — OpenClaw config keys that must be truthy
+- `requires.bins` - binaries that must exist on `PATH`
+- `requires.env` - environment variables the skill depends on
+- `requires.config` - OpenClaw config keys that must be truthy
 
 ### Installation
 
-Symlink or clone this repo into the OpenClaw skills directory:
+`install.sh` handles OpenClaw skill registration automatically. To link
+manually:
 
 ```bash
 ln -s /path/to/ESPHome-Python ~/.openclaw/skills/esphome-lights
@@ -248,11 +255,12 @@ Ensure `ESPHOME_LIGHTS_*` env vars are available to the agent.
 ## Current State
 
 - **Version:** 0.1.0
-- **Status:** Daemon + thin CLI client architecture implemented.
+- **Status:** Daemon + thin CLI client architecture implemented, with user-level installer.
 - The daemon (`esphome-lightsd.py`) maintains persistent connections and
   serves commands via a Unix domain socket.
 - The CLI client (`esphome-lights.py`) uses only stdlib for sub-100 ms startup.
-- systemd unit file provided for auto-starting on boot.
+- `install.sh` installs as a systemd user service (no sudo required), checks
+  for config, and offers OpenClaw skill registration.
 - 49 unit tests covering daemon handlers, socket protocol, entity resolution,
   state caching, and client-daemon integration.
 
@@ -262,5 +270,5 @@ Ensure `ESPHOME_LIGHTS_*` env vars are available to the agent.
   Daemon architecture should achieve the sub-100 ms target but needs
   real-world validation.
 - **Python 3.13 confirmed working** on the Luckfox Pico with
-  `aioesphomeapi` 44.0.0.  See the Dev Environment section for the
+  `aioesphomeapi` 44.0.0. See the Dev Environment section for the
   `noiseprotocol` gotcha.
