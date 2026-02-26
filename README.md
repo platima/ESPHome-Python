@@ -7,7 +7,7 @@ native ESPHome API, designed as an
 [OpenClaw](https://github.com/openclaw/openclaw) skill for
 voice/chat-driven home automation.
 
-**Version:** 0.1.0
+**Version:** 0.1.1
 
 ## Overview
 

@@ -254,7 +254,7 @@ Ensure `ESPHOME_LIGHTS_*` env vars are available to the agent.
 
 ## Current State
 
-- **Version:** 0.1.0
+- **Version:** 0.1.1
 - **Status:** Daemon + thin CLI client architecture implemented, with user-level installer.
 - The daemon (`esphome-lightsd.py`) maintains persistent connections and
   serves commands via a Unix domain socket.

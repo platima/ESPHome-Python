@@ -1,6 +1,6 @@
 ---
 name: esphome-lights
-description: Control ESPHome smart lights and switches — on/off, brightness, RGB colour, and status queries
+description: Control ESPHome smart lights and switches - on/off, brightness, RGB colour, and status queries
 metadata:
   {
     "openclaw": {
@@ -15,64 +15,65 @@ metadata:
 
 # ESPHome Lights
 
-Control ESPHome smart lights and switches via the native ESPHome API.  Uses the
+Control ESPHome smart lights and switches via the native ESPHome API. Uses the
 `esphome-lights.py` CLI tool which communicates over the ESPHome native protocol
 (port 6053, Noise encryption).
 
 ## Available Commands
 
-Run these via the `exec` tool.  Replace `<device>` with the location name
+Run these via the `exec` tool. Replace `<device>` with the location name
 (lowercased, e.g. `living_room`, `bedroom`).
 
 ### List all configured devices
 
 ```bash
-esphome-lights.py --list
+esphome-lights --list
 ```
 
-Output: one line per device showing `location -> host:port`.
+Output: one line per device showing `location -> host:port  [connection-state] (entity-type)`.
 
 ### Show on/off state of all devices
 
 ```bash
-esphome-lights.py --status
+esphome-lights --status
 ```
 
-Output: one line per device showing `location  ON/OFF`.
+Output: one line per device showing `location  ON/OFF  (entity-type)`. For lights
+that are ON, brightness (0-255) and RGB values are also shown.
 
 ### Turn a light on
 
 ```bash
-esphome-lights.py --set <device> --on
+esphome-lights --set <device> --on
 ```
 
 ### Turn a light off
 
 ```bash
-esphome-lights.py --set <device> --off
+esphome-lights --set <device> --off
 ```
 
-### Set brightness (0–255)
+### Set brightness (0-255)
 
 ```bash
-esphome-lights.py --set <device> --brightness <value>
+esphome-lights --set <device> --brightness <value>
 ```
 
-Only works for light entities.  Returns an error for switch-type devices
+Only works for light entities. Returns an error for switch-type devices
 (smart plugs).
 
-### Set RGB colour (r,g,b — each 0–255)
+### Set RGB colour (r,g,b - each 0-255)
 
 ```bash
-esphome-lights.py --set <device> --rgb <r>,<g>,<b>
+esphome-lights --set <device> --rgb <r>,<g>,<b>
 ```
 
-Only works for light entities.  Returns an error for switch-type devices.
+Only works for light entities. Returns an error for switch-type devices.
 
 ### Health check (daemon mode)
 
 ```bash
-esphome-lights.py --ping
+esphome-lights --ping
 ```
 
 Returns `pong` if the daemon is running.

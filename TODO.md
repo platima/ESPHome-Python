@@ -1,15 +1,16 @@
 # TODO.md — Persistent Task Tracker
 
-This file is the persistent plan across sessions.  If a session is lost, the
+This file is the persistent plan across sessions. If a session is lost, the
 next session picks up from here.
 
 ---
 
-## Phase 2: OpenClaw Skill Integration
+## Future / Nice to Have
 
-- [ ] Create `SKILL.md` for OpenClaw skill registration
-- [ ] Test skill loading via OpenClaw agent
-- [ ] Document OpenClaw integration in README
+- [ ] Benchmark daemon performance on the Luckfox Pico target hardware.
+- [ ] Evaluate Python 3.14 free-threaded support for async performance gains.
+- [ ] Test OpenClaw skill loading against a live OpenClaw agent.
+- [ ] Add `.gitattributes` to enforce LF line endings for `*.sh` files.
 
 ---
 
@@ -83,3 +84,21 @@ next session picks up from here.
       entity resolution, state caching, client-daemon integration)
 - [x] Update README.md, CLAUDE.md, TODO.md
 - [x] Bump VERSION to 0.1.0
+
+### Phase 2: OpenClaw + Code Quality (v0.1.1)
+
+- [x] Create `SKILL.md` for OpenClaw skill registration
+- [x] Document OpenClaw integration in README
+- [x] Code review merge: surface entity type (light/switch) in `--list`
+      and `--status` output; enrich `--status` with brightness/RGB for ON lights
+- [x] Add `install.sh`: one-line user-level installer (no sudo required)
+  - Refuses to run as root
+  - Installs to `~/.local/lib/esphome-lights/` with `~/.local/bin/` symlinks
+  - Generates systemd user service with socket at `$XDG_RUNTIME_DIR`
+  - Enables `loginctl linger` for boot-time start
+  - Checks `~/.config/esphome-lights/env`, offers template creation
+  - Detects `~/.openclaw` and offers skill registration
+- [x] Fix README/CLAUDE.md/SKILL.md typography (em-dashes, double spaces,
+      broken URLs)
+- [x] Update SKILL.md output descriptions for entity type and light details
+- [x] Bump VERSION to 0.1.1
