@@ -3,8 +3,8 @@
 # ESPHome Lights for Python / OpenClaw
 
 A Python CLI tool for controlling ESPHome smart lights and switches via the
-native ESPHome API.  Designed as an
-[OpenClaw]([https://github.com/nicholasgriffintn/openclaw](https://github.com/openclaw/openclaw)) skill for
+native ESPHome API, designed as an
+[OpenClaw](https://github.com/nicholasgriffintn/openclaw) skill for
 voice/chat-driven home automation.
 
 **Version:** 0.1.0
@@ -12,12 +12,12 @@ voice/chat-driven home automation.
 ## Overview
 
 ESPHome Lights lets you turn lights on/off, set brightness, and set RGB
-colours from the command line.  Devices are discovered from environment
+colours from the command line. Devices are discovered from environment
 variables; no separate config files to manage.
 
-The project uses a **persistent daemon + thin CLI client** architecture.  The
+The project uses a **persistent daemon + thin CLI client** architecture. The
 daemon keeps ESPHome API connections alive, eliminating the ~4.2 s cold-start
-latency of a monolithic script.  The CLI client uses only Python stdlib for
+latency of a monolithic script. The CLI client uses only Python stdlib for
 fast startup and communicates with the daemon over a Unix domain socket.
 
 ### Architecture
@@ -36,12 +36,12 @@ CLI client  —(Unix socket)—>  Daemon  —(persistent ESPHome API connections
 
 ## Requirements
 
-- **Python 3.11 or 3.13** — both confirmed working with `aioesphomeapi` 44.0.0.
+- **Python 3.11 or 3.13** - both confirmed working with `aioesphomeapi` 44.0.0.
   > **Gotcha:** `noise` 1.2.2 (Perlin noise) and `noiseprotocol` both install
-  > into the same `noise/` directory.  If you ever `pip uninstall noise`, run
+  > into the same `noise/` directory. If you ever `pip uninstall noise`, run
   > `pip install --force-reinstall noiseprotocol` immediately after to restore
   > the directory that `aioesphomeapi` needs.
-- **`aioesphomeapi`** — install via pip
+- **`aioesphomeapi`** - install via pip
 - ESPHome devices with the native API enabled and encryption keys configured
 
 ## Installation
@@ -57,7 +57,7 @@ cd ESPHome-Python
 
 ## Device Configuration
 
-Devices are configured via environment variables.  Each variable follows the
+Devices are configured via environment variables. Each variable follows the
 format:
 
 ```
@@ -97,7 +97,7 @@ python3 esphome-lightsd.py
 # List configured lights (shows connection state)
 esphome-lights.py --list
 
-# Show on/off state of all lights (from daemon cache — instant)
+# Show on/off state of all lights (from daemon cache - instant)
 esphome-lights.py --status
 
 # Turn a light on or off
@@ -107,7 +107,7 @@ esphome-lights.py --set living_room --off
 # Set brightness (0–255)
 esphome-lights.py --set living_room --brightness 128
 
-# Set RGB colour (r,g,b — each 0–255)
+# Set RGB colour (r,g,b, each 0-255)
 esphome-lights.py --set living_room --rgb 255,0,0
 
 # Health check
@@ -118,7 +118,7 @@ esphome-lights.py --ping
 
 | Flag                   | Effect                                          |
 |------------------------|-------------------------------------------------|
-| `--bg`, `--background` | Fire and forget — return immediately            |
+| `--bg`, `--background` | Fire and forget - return immediately            |
 | `--debug`              | Show full JSON response (overrides `--bg`)      |
 
 ## Entity Handling
@@ -133,7 +133,7 @@ esphome-lights.py --ping
 ### Protocol
 
 The daemon listens on a Unix socket (`/tmp/esphome-lights.sock` by default,
-configurable via `ESPHOME_LIGHTS_SOCKET`).  Communication uses
+configurable via `ESPHOME_LIGHTS_SOCKET`). Communication uses
 newline-delimited JSON.
 
 **Requests:**
@@ -159,10 +159,10 @@ newline-delimited JSON.
 
 - **Persistent connections** to all configured ESPHome devices
 - **Automatic reconnection** with exponential backoff (1 s → 30 s max)
-- **State caching** — `--status` returns instantly from cache
+- **State caching** - `--status` returns instantly from cache
 - **Multiple concurrent clients** supported
 - **Graceful shutdown** on SIGTERM/SIGINT (cleans up socket file)
-- **Stale socket detection** — removes orphaned socket files on startup
+- **Stale socket detection** - removes orphaned socket files on startup
 - **Configurable logging** via `ESPHOME_LIGHTS_LOG_LEVEL` env var
 
 ### systemd
@@ -209,13 +209,13 @@ User (WhatsApp/Telegram/etc.)
 
 The OpenClaw agent reads the `SKILL.md` file to understand available commands,
 then uses its `exec` tool to run `esphome-lights.py` with the appropriate
-flags.  Natural-language requests like *"turn on the living room light"* are
+flags. Natural-language requests like *"turn on the living room light"* are
 translated to CLI commands automatically.
 
 ### Skill Installation
 
 The `SKILL.md` file at the repository root registers ESPHome Lights as an
-OpenClaw skill.  To install:
+OpenClaw skill. To install:
 
 1. Clone this repository into your OpenClaw workspace's `skills/` directory,
    or symlink it:
@@ -243,8 +243,8 @@ openclaw cron add \
 
 ## Deployment Target
 
-This project is designed to run on a **Luckfox Pico** (ARM Linux SBC) — a
-resource-constrained device.  The daemon architecture is deliberately kept
+This project is designed to run on a **Luckfox Pico** (ARM Linux SBC), a
+resource-constrained device. The daemon architecture is deliberately kept
 simple with no heavy frameworks.
 
 ## Running Tests
