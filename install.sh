@@ -173,9 +173,17 @@ if [[ -d "$VENV_DIR" ]]; then
     ok "Python 3.11 venv exists: $VENV_DIR"
 else
     info "Creating Python 3.11 venv at $VENV_DIR ..."
-    "$PYTHON311" -m venv "$VENV_DIR" \
+    "$PYTHON311" -m venv --upgrade-deps "$VENV_DIR" \
         || die "Failed to create venv. Ensure python3.11-venv is installed: sudo apt install python3.11-venv"
     ok "Venv created."
+fi
+
+# Bootstrap pip if the venv was created without it (Debian omits pip by default).
+if [[ ! -f "$VENV_DIR/bin/pip" ]]; then
+    info "Bootstrapping pip into venv ..."
+    "$VENV_PYTHON" -m ensurepip --upgrade \
+        || die "Failed to bootstrap pip. Try: sudo apt install python3.11-distutils"
+    ok "pip bootstrapped."
 fi
 
 if ! "$VENV_PYTHON" -c "import aioesphomeapi" 2>/dev/null; then
