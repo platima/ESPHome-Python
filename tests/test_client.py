@@ -210,17 +210,22 @@ class TestClientDaemonIntegration(unittest.TestCase):
         asyncio.run(run())
 
     def test_send_reload(self):
-        """Client sends reload, gets ok response."""
+        """Client sends reload, gets ok response (no real env files loaded)."""
 
         async def run():
             fd = FakeDaemon()
             await fd.start()
             try:
-                resp = await self._run_client_in_thread(fd, {"cmd": "reload"})
-                # FakeDaemon echoes unknown cmds with ok:false, but we just
-                # verify the command was sent and a JSON response received.
+                # Patch load_env (noop) and load_devices to return the same
+                # devices already in the manager so handle_reload sees no
+                # changes and never calls _connect.
+                with patch.object(daemon, "load_env"), \
+                     patch.object(daemon, "load_devices",
+                                  return_value=fd.manager._devices):
+                    resp = await self._run_client_in_thread(fd, {"cmd": "reload"})
                 self.assertIsInstance(resp, dict)
-                self.assertIn("ok", resp)
+                self.assertTrue(resp["ok"])
+                self.assertIn("2 unchanged", resp["result"])
             finally:
                 await fd.stop()
 
