@@ -400,6 +400,21 @@ systemctl --user enable "$SERVICE_NAME" \
     && ok "Service enabled: $SERVICE_NAME" \
     || warn "Could not enable service automatically. Enable manually: systemctl --user enable $SERVICE_NAME"
 
+# Explicitly start (or restart on update) the service so state is always
+# intentional and visible. Without this, systemd silently auto-starts the
+# service during 'enable' when linger is active and default.target is met.
+if systemctl --user is-active "$SERVICE_NAME" > /dev/null 2>&1; then
+    info "Restarting $SERVICE_NAME ..."
+    systemctl --user restart "$SERVICE_NAME" \
+        && ok "Service restarted." \
+        || warn "Could not restart service. Restart manually: systemctl --user restart $SERVICE_NAME"
+else
+    info "Starting $SERVICE_NAME ..."
+    systemctl --user start "$SERVICE_NAME" \
+        && ok "Service started." \
+        || warn "Could not start service. Start manually: systemctl --user start $SERVICE_NAME"
+fi
+
 # Enable linger: keeps the user session alive at boot so the service
 # starts without requiring the user to be logged in.
 if command -v loginctl > /dev/null 2>&1; then
@@ -444,10 +459,9 @@ echo
 info "Next steps:"
 echo "  1. Edit your device config:    $ENV_FILE"
 echo "     (or add ESPHOME_LIGHTS_* vars to ~/.openclaw/workspace/.env)"
-echo "  2. Start the daemon:           systemctl --user start $SERVICE_NAME"
-echo "  3. Check daemon status:        systemctl --user status $SERVICE_NAME"
-echo "  4. List configured devices:    esphome-lights --list"
-echo "  5. Check device states:        esphome-lights --status"
+echo "  2. Check daemon status:        systemctl --user status $SERVICE_NAME"
+echo "  3. List configured devices:    esphome-lights --list"
+echo "  4. Check device states:        esphome-lights --status"
 echo
 info "After editing config, reload without restarting:"
 echo "  esphome-lights --reload"
