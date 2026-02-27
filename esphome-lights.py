@@ -27,7 +27,11 @@ import os
 import socket
 import sys
 
-SOCKET_PATH = os.environ.get("ESPHOME_LIGHTS_SOCKET", "/tmp/esphome-lights.sock")
+_xdg = os.environ.get("XDG_RUNTIME_DIR", "")
+SOCKET_PATH = os.environ.get(
+    "ESPHOME_LIGHTS_SOCKET",
+    os.path.join(_xdg, "esphome-lights.sock") if _xdg else "/tmp/esphome-lights.sock",
+)
 SOCKET_TIMEOUT = 5  # seconds
 
 

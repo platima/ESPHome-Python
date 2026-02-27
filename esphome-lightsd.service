@@ -1,3 +1,12 @@
+# Reference service file — the installer (install.sh) generates the real
+# ~/.config/systemd/user/esphome-lightsd.service with correct paths.
+#
+# Key differences from a system-level service:
+#   - Installed as a USER service (systemctl --user ...), not system-wide.
+#   - ExecStart uses the Python 3.11 venv created by the installer.
+#   - Socket path is derived from XDG_RUNTIME_DIR automatically by the daemon.
+#   - No EnvironmentFile= -- env loading is handled by esphome-lightsd.py.
+
 [Unit]
 Description=ESPHome Lights Daemon
 Documentation=https://github.com/platima/ESPHome-Python
@@ -6,19 +15,10 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/python3 /home/luckfox/ESPHome-Python/esphome-lightsd.py
-WorkingDirectory=/home/luckfox/ESPHome-Python
-EnvironmentFile=/home/luckfox/.env
-
+ExecStart=%h/.local/lib/esphome-lights/venv/bin/python %h/.local/lib/esphome-lights/esphome-lightsd.py
+WorkingDirectory=%h/.local/lib/esphome-lights
 Restart=on-failure
 RestartSec=5
 
-# Security hardening
-NoNewPrivileges=true
-ProtectSystem=strict
-ProtectHome=read-only
-ReadWritePaths=/tmp
-PrivateTmp=false
-
 [Install]
-WantedBy=multi-user.target
+WantedBy=default.target

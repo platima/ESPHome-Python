@@ -268,7 +268,6 @@ Wants=network-online.target
 Type=simple
 ExecStart=$VENV_PYTHON $INSTALL_LIB/esphome-lightsd.py
 WorkingDirectory=$INSTALL_LIB
-Environment=ESPHOME_LIGHTS_SOCKET=%t/esphome-lights.sock
 Restart=on-failure
 RestartSec=5
 
