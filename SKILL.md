@@ -5,7 +5,7 @@ metadata:
   {
     "openclaw": {
       "requires": {
-        "bins": ["python3"],
+        "bins": ["bash", "python3"],
         "config": ["tools.exec.enabled"]
       },
       "user-invocable": true
@@ -15,9 +15,10 @@ metadata:
 
 # ESPHome Lights
 
-Control ESPHome smart lights and switches via the native ESPHome API. Uses the
-`esphome-lights.py` CLI tool which communicates over the ESPHome native protocol
-(port 6053, Noise encryption).
+Control ESPHome smart lights and switches via the native ESPHome API. The
+`esphome-lights` shell CLI sends commands directly to the daemon socket via
+`socat` or `nc` for sub-10ms response times on ARM targets. Python is used
+only for `--list`/`--status` output formatting.
 
 ## Available Commands
 

@@ -207,7 +207,8 @@ systemctl --user status > /dev/null 2>&1 \
 
 # 3. Python 3.11 — required for the daemon (aioesphomeapi + Noise encryption
 #    has compatibility issues with Python 3.12/3.13 on ARM targets).
-#    The CLI client is stdlib-only and works with any python3.
+#    The CLI shell wrapper uses bash + socat/nc; Python is only needed for
+#    the daemon and for --list/--status output formatting.
 PYTHON311=""
 for candidate in python3.11; do
     if command -v "$candidate" > /dev/null 2>&1; then
@@ -216,16 +217,21 @@ for candidate in python3.11; do
     fi
 done
 if [[ -z "$PYTHON311" ]]; then
-    warn "Python 3.11 not found. The daemon requires Python 3.11 for Noise encryption compatibility."
-    if ask_yn "Install python3.11 and python3.11-venv via apt now?" "y"; then
-        sudo apt-get install -y python3.11 python3.11-venv \
-            || die "apt install failed. Install manually: sudo apt install python3.11 python3.11-venv"
-        PYTHON311="python3.11"
-    else
-        die "Python 3.11 is required. Install it manually: sudo apt install python3.11 python3.11-venv"
-    fi
+    die "Python 3.11 not found. The daemon requires Python 3.11 for Noise encryption compatibility.\n  Install manually (no sudo needed with pyenv): https://github.com/pyenv/pyenv\n  Or with system package manager: apt/dnf install python3.11"
 fi
 info "Using Python 3.11: $PYTHON311  ($($PYTHON311 --version 2>&1))"
+
+# 4. socat / nc — needed for the fast CLI path (~10ms on ARM).
+#    Falls back to a Python one-liner (~150ms) if neither is available.
+#    Cannot be installed without sudo; just warn so the user can act.
+if command -v socat >/dev/null 2>&1; then
+    ok "socat found — CLI will use fast socket path (~10ms)."
+elif command -v nc >/dev/null 2>&1; then
+    ok "nc found — CLI will use fast socket path (~10ms)."
+else
+    warn "Neither socat nor nc found. CLI will fall back to Python one-liner (~150ms)."
+    warn "For best performance, install socat: apt/dnf install socat"
+fi
 
 # ---------------------------------------------------------------------------
 # Locate source files (local repo or clone)

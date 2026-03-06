@@ -93,6 +93,7 @@ and offers to remove the venv (default: remove) and config dir (default: keep).
 5. Install and enable a systemd user service (using the venv Python) with the socket at `$XDG_RUNTIME_DIR/esphome-lights.sock`.
 6. Enable `loginctl linger` so the daemon starts at boot without requiring login.
 7. Detect `~/.openclaw` and offer to register the skill if OpenClaw is installed.
+8. Warn if `socat`/`nc` are not found (needed for the ~10ms fast path; falls back to Python one-liner at ~150ms).
 
 ## Device Configuration
 
