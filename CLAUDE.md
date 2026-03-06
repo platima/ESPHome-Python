@@ -42,10 +42,11 @@ CLI client  —(Unix socket)—>  Daemon  —(persistent ESPHome API connections
 
 | Component            | Detail                                         |
 |----------------------|------------------------------------------------|
-| Language             | Python 3.11 (daemon venv), any python3 (CLI)   |
+| Language             | Bash (CLI wrapper), Python 3.11 (daemon venv)  |
 | Async framework      | `asyncio` (stdlib)                             |
 | ESPHome comms        | `aioesphomeapi` (Noise protocol, protobuf)     |
 | IPC                  | Unix domain socket, newline-delimited JSON     |
+| CLI socket transport | `socat` (preferred) or `nc -U` (fallback)      |
 | Process management   | systemd (on the Luckfox deployment target)     |
 | Config               | Environment variables + `.env` file            |
 
@@ -54,7 +55,8 @@ CLI client  —(Unix socket)—>  Daemon  —(persistent ESPHome API connections
 | File                        | Purpose                                              |
 |-----------------------------|------------------------------------------------------|
 | `install.sh`                | One-line user-level installer (no sudo)              |
-| `esphome-lights.py`         | Thin CLI client (stdlib only, fast startup)          |
+| `esphome-lights`            | Shell CLI wrapper (fast path via socat/nc, ~10ms)    |
+| `esphome-lights.py`         | Python CLI (list/status formatting + fallback)       |
 | `esphome-lightsd.py`        | Daemon (persistent connections + Unix socket)        |
 | `esphome-lightsd.service`   | systemd unit file (system-level reference)           |
 | `tests/`                    | Unit tests (test_daemon.py, test_client.py)          |
@@ -98,8 +100,8 @@ so that SIGHUP-triggered reloads pick up changes immediately.
 ```
 esphome-lights --list                              # List configured lights
 esphome-lights --status                            # Show on/off state
-esphome-lights --device <id|all> --on              # Turn on
-esphome-lights --device <id|all> --off             # Turn off
+esphome-lights --device <id|all> --on              # Turn on  (~10ms via socat)
+esphome-lights --device <id|all> --off             # Turn off (~10ms via socat)
 esphome-lights --device <id|all> --brightness N    # Set brightness (0-255)
 esphome-lights --device <id|all> --rgb r,g,b       # Set RGB colour
 esphome-lights --ping                              # Health check (daemon mode)
@@ -107,7 +109,7 @@ esphome-lights --reload                            # Reload config without resta
 
 Flags:
   --bg, --background   Fire and forget (return immediately)
-  --debug              Wait for completion and show detailed results
+  --debug              Wait for completion and show detailed results (delegates to Python)
 ```
 
 ## Entity Handling
@@ -269,23 +271,22 @@ Ensure `ESPHOME_LIGHTS_*` env vars are available to the agent.
 
 ## Current State
 
-- **Version:** 0.1.5
-- **Status:** Daemon + thin CLI client architecture implemented, with user-level installer.
-- The daemon (`esphome-lightsd.py`) maintains persistent connections and
-  serves commands via a Unix domain socket.
-- The CLI client (`esphome-lights.py`) uses only stdlib for sub-100 ms startup.
-- `install.sh` installs as a systemd user service (no sudo required), checks
-  for config, and offers OpenClaw skill registration. Supports `--fast`
-  (non-interactive) and `--uninstall` flags.
+- **Version:** 0.1.7
+- **Status:** Shell CLI wrapper + daemon architecture. Control commands (on/off/brightness/rgb/ping/reload) achieve sub-10ms response times via socat/nc on ARM.
+- The shell wrapper (`esphome-lights`) handles all control commands natively; delegates `--list`/`--status`/`--debug` to `esphome-lights.py`.
+- The Python CLI (`esphome-lights.py`) is retained for complex output formatting and as a universal fallback.
+- The daemon (`esphome-lightsd.py`) maintains persistent connections and serves commands via a Unix domain socket.
+- `install.sh` installs as a systemd user service (no sudo required), checks for config, and offers OpenClaw skill registration. Supports `--fast` (non-interactive) and `--uninstall` flags.
 - `--device all` broadcasts commands to every device at once.
-- 63 unit tests covering daemon handlers, socket protocol, entity resolution,
-  state caching, client-daemon integration, and all-device wildcard broadcast.
+- 63 unit tests covering daemon handlers, socket protocol, entity resolution, state caching, client-daemon integration, and all-device wildcard broadcast.
 
 ## Known Limitations
 
 - **Performance not yet benchmarked** on the Luckfox Pico target hardware.
-  Daemon architecture should achieve the sub-100 ms target but needs
-  real-world validation.
+  RK3576 measured ~10ms for control commands via socat; similar expected on
+  Luckfox Pico.
+- **`--list` and `--status` still use Python** for output formatting (~150ms
+  on ARM). These are informational commands so latency is less critical.
 - **Python 3.13 confirmed working** on the Luckfox Pico with
   `aioesphomeapi` 44.0.0. See the Dev Environment section for the
   `noiseprotocol` gotcha.

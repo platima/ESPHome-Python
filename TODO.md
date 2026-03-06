@@ -10,6 +10,7 @@ next session picks up from here.
 - [ ] Benchmark daemon performance on the Luckfox Pico target hardware.
 - [ ] Evaluate Python 3.14 free-threaded support for async performance gains.
 - [ ] Test OpenClaw skill loading against a live OpenClaw agent.
+- [ ] Add shell CLI tests (bash bats or similar) for the socat/nc fast path.
 
 ---
 
@@ -146,3 +147,22 @@ next session picks up from here.
       aioesphomeapi in venv; point systemd ExecStart at venv python (v0.1.4)
 - [x] Correct CLAUDE.md/README.md Python version notes (3.11 venv required,
       3.12/3.13 has ARM noise/Cython incompatibility) (v0.1.4)
+### Phase 6: Production readiness + shell CLI wrapper (v0.1.6–v0.1.7)
+
+- [x] Add `.gitattributes` to enforce LF line endings (install.sh breaks with
+      CRLF on Windows git clones)
+- [x] Expand `.gitignore`: `.vscode/`, `*.code-workspace`, `.env`, `venv/`
+- [x] Remove dev cruft from repo: `cpython.txt`, `.code-workspace`
+- [x] Fix deprecated `asyncio.get_event_loop()` → `get_running_loop()`
+- [x] Fix README: test count, licence section, performance table
+- [x] Fix CLAUDE.md: stale CLI examples, version, test count
+- [x] Fix TODO.md: deduplicate sections
+- [x] Bump to v0.1.6
+- [x] Replace Python CLI with shell wrapper (`esphome-lights`) that uses
+      `socat`/`nc` for direct socket I/O — ~10ms on ARM vs ~350ms Python
+- [x] Python CLI (`esphome-lights.py`) retained as formatter for
+      `--list`/`--status` and universal fallback
+- [x] Update `install.sh`: copy + chmod shell wrapper; symlink it as the
+      default `esphome-lights` command
+- [x] Update README, CLAUDE.md, TODO.md with shell wrapper docs
+- [x] Bump to v0.1.7

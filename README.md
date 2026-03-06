@@ -7,7 +7,7 @@ native ESPHome API, designed as an
 [OpenClaw](https://github.com/openclaw/openclaw) skill for
 voice/chat-driven home automation.
 
-**Version:** 0.1.5
+**Version:** 0.1.7
 
 ## Overview
 
@@ -15,21 +15,22 @@ ESPHome Lights lets you turn lights on/off, set brightness, and set RGB
 colours from the command line. Devices are discovered from environment
 variables; no separate config files to manage.
 
-The project uses a **persistent daemon + thin CLI client** architecture. The
-daemon keeps ESPHome API connections alive, eliminating the ~4.2 s cold-start
-latency of a monolithic script. The CLI client uses only Python stdlib for
-fast startup and communicates with the daemon over a Unix domain socket.
+The project uses a **persistent daemon + shell CLI** architecture. The
+daemon keeps ESPHome API connections alive. The CLI is a shell script that
+talks to the daemon socket directly via `socat` or `nc`, achieving sub-10ms
+overhead on ARM targets (vs ~350ms for a Python CLI on the same hardware).
 
 ### Architecture
 
 ```
-CLI client  —(Unix socket)—>  Daemon  —(persistent ESPHome API connections)—>  Devices
+CLI (shell)  —(Unix socket)—>  Daemon  —(persistent ESPHome API connections)—>  Devices
 ```
 
 | Component              | File                      | Purpose                              |
 |------------------------|---------------------------|--------------------------------------|
+| Shell CLI              | `esphome-lights`          | Fast path: socat/nc socket client    |
+| Python CLI             | `esphome-lights.py`       | Formatting fallback (list/status)    |
 | Daemon                 | `esphome-lightsd.py`      | Persistent connections, state cache  |
-| CLI client             | `esphome-lights.py`       | Thin stdlib-only client, fast start  |
 | systemd unit           | `esphome-lightsd.service` | Auto-start on boot                   |
 | Tests                  | `tests/`                  | Unit tests (63 tests)                |
 | OpenClaw skill         | `SKILL.md`                | Chat-driven control via OpenClaw     |
@@ -39,10 +40,14 @@ CLI client  —(Unix socket)—>  Daemon  —(persistent ESPHome API connections
 - **Python 3.11** - required for the daemon due to `aioesphomeapi` + Noise
   encryption compatibility on ARM targets. Python 3.12/3.13 has issues with
   the compiled `noise` extension on ARM (e.g. Luckfox Pico, Orange Pi).
-  The CLI client is stdlib-only and works with any `python3`.
+  The CLI shell wrapper uses only `bash` + `socat`/`nc`; Python is only
+  invoked for `--list`/`--status` output formatting.
   > **Gotcha:** `noise` 1.2.2 (Perlin noise) and `noiseprotocol` both install
   > into the same `noise/` directory. The installer force-reinstalls
   > `noiseprotocol` after `aioesphomeapi` to guard against this automatically.
+- **`socat`** (recommended) or **`nc` with Unix socket support** — for the
+  fast CLI path. Falls back to a Python one-liner if neither is available,
+  but with ~150ms overhead instead of ~10ms.
 - **`aioesphomeapi`** - installed into the venv by the installer
 - ESPHome devices with the native API enabled and encryption keys configured
 
@@ -260,14 +265,17 @@ journalctl --user -u esphome-lightsd -f
 A system-level unit file (`esphome-lightsd.service`) is also included in the
 repo for manual system-wide installs (requires root).
 
-### Performance Targets
+### Performance
 
-| Metric                  | Current | Target    |
-|-------------------------|---------|-----------|
-| `--device` command      | ~4.2 s  | < 100 ms  |
-| `--status` (all devices)| ~5–8 s  | < 50 ms   |
-| `--list`                | ~1.5 s  | < 50 ms   |
-| CLI client startup      | ~1.5 s  | < 30 ms   |
+| Metric                    | Old (monolithic Python) | Current          |
+|---------------------------|-------------------------|------------------|
+| `--device` command        | ~4.2 s                  | **~10 ms** ¹     |
+| `--status` (all devices)  | ~5–8 s                  | **< 50 ms** ²    |
+| `--list`                  | ~1.5 s                  | **< 50 ms** ²    |
+| CLI startup overhead      | ~1.5 s                  | **~10 ms** ¹     |
+
+¹ Shell CLI via `socat`/`nc` on ARM (RK3576 measured). Python fallback ~150ms.  
+² Delegates to Python for formatting; daemon response itself is < 1ms.
 
 ## OpenClaw Integration
 
@@ -343,7 +351,8 @@ state caching, client-daemon integration, and all-device wildcard broadcast.
 ```
 ESPHome-Python/
 ├── install.sh                  # One-line installer (user-level, no sudo)
-├── esphome-lights.py           # Thin CLI client (stdlib only)
+├── esphome-lights              # Shell CLI wrapper (fast path: socat/nc)
+├── esphome-lights.py           # Python CLI (list/status formatting, fallback)
 ├── esphome-lightsd.py          # Daemon (persistent connections + socket)
 ├── esphome-lightsd.service     # systemd unit file (system-level reference)
 ├── tests/

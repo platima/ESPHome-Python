@@ -156,7 +156,8 @@ do_uninstall() {
 
     # 7. Remove scripts (and venv if requested)
     if [[ -d "$INSTALL_LIB" ]]; then
-        rm -f "$INSTALL_LIB/esphome-lights.py" \
+        rm -f "$INSTALL_LIB/esphome-lights" \
+              "$INSTALL_LIB/esphome-lights.py" \
               "$INSTALL_LIB/esphome-lightsd.py" \
               "$INSTALL_LIB/SKILL.md"
         if [[ $KEEP_VENV -eq 0 ]]; then
@@ -257,13 +258,18 @@ fi
 
 info "Installing scripts to $INSTALL_LIB ..."
 mkdir -p "$INSTALL_LIB" "$INSTALL_BIN"
+cp "$SOURCE_DIR/esphome-lights"     "$INSTALL_LIB/"
 cp "$SOURCE_DIR/esphome-lights.py"  "$INSTALL_LIB/"
 cp "$SOURCE_DIR/esphome-lightsd.py" "$INSTALL_LIB/"
 cp "$SOURCE_DIR/SKILL.md"           "$INSTALL_LIB/"
-chmod +x "$INSTALL_LIB/esphome-lights.py" "$INSTALL_LIB/esphome-lightsd.py"
+chmod +x "$INSTALL_LIB/esphome-lights" \
+         "$INSTALL_LIB/esphome-lights.py" \
+         "$INSTALL_LIB/esphome-lightsd.py"
 
-# Symlinks in ~/.local/bin so the commands are on PATH
-ln -sf "$INSTALL_LIB/esphome-lights.py"  "$INSTALL_BIN/esphome-lights"
+# Symlinks in ~/.local/bin so the commands are on PATH.
+# esphome-lights -> shell wrapper (fast, ~10ms via socat/nc)
+# esphome-lightsd -> Python daemon
+ln -sf "$INSTALL_LIB/esphome-lights"    "$INSTALL_BIN/esphome-lights"
 ln -sf "$INSTALL_LIB/esphome-lightsd.py" "$INSTALL_BIN/esphome-lightsd"
 ok "Scripts installed."
 

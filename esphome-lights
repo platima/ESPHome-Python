@@ -1,0 +1,220 @@
+#!/usr/bin/env bash
+# =============================================================================
+# esphome-lights — Fast shell CLI for the esphome-lightsd daemon
+# =============================================================================
+#
+# Connects to the daemon Unix socket directly via socat or nc, bypassing
+# Python startup overhead for sub-100ms response times on ARM targets.
+#
+# Startup path:
+#   socat/nc available  →  ~10ms   (shell + socket only)
+#   socat/nc missing    →  ~150ms  (Python one-liner fallback)
+#   --list / --status   →  Python  (complex object formatting)
+#
+# Usage:
+#   esphome-lights --list
+#   esphome-lights --status
+#   esphome-lights --device <id|all> --on
+#   esphome-lights --device <id|all> --off
+#   esphome-lights --device <id|all> --brightness N   (0-255)
+#   esphome-lights --device <id|all> --rgb r,g,b
+#   esphome-lights --ping
+#   esphome-lights --reload
+#
+# Flags:
+#   --bg, --background   Fire and forget (return immediately)
+#   --debug              Show full JSON response from daemon
+#
+# Falls back to esphome-lights.py for: --list, --status, --debug, --help
+# =============================================================================
+
+set -euo pipefail
+
+# ---------------------------------------------------------------------------
+# Socket path — mirrors the logic in esphome-lightsd.py
+# ---------------------------------------------------------------------------
+
+_xdg="${XDG_RUNTIME_DIR:-}"
+SOCKET_PATH="${ESPHOME_LIGHTS_SOCKET:-}"
+if [[ -z "$SOCKET_PATH" ]]; then
+    if [[ -n "$_xdg" ]]; then
+        SOCKET_PATH="${_xdg}/esphome-lights.sock"
+    else
+        SOCKET_PATH="/tmp/esphome-lights.sock"
+    fi
+fi
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+_die()  { printf 'Error: %s\n' "$*" >&2; exit 1; }
+
+# Locate the Python companion script relative to this script's real location.
+# Works correctly when this script is called via a symlink.
+_py_script() {
+    local real_dir
+    real_dir="$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")"
+    printf '%s/esphome-lights.py' "$real_dir"
+}
+
+# Send a JSON request to the daemon and print the raw JSON response.
+# Tries socat then nc; falls back to a minimal Python one-liner.
+_send() {
+    local json="$1"
+    [[ -S "$SOCKET_PATH" ]] || _die "esphome-lightsd is not running (socket not found)"
+
+    if command -v socat >/dev/null 2>&1; then
+        # head -1 reads exactly one response line; SIGPIPE tells socat to exit.
+        printf '%s\n' "$json" | socat - "UNIX-CONNECT:${SOCKET_PATH}" | head -1
+    elif command -v nc >/dev/null 2>&1; then
+        printf '%s\n' "$json" | nc -U "$SOCKET_PATH" | head -1
+    else
+        # Minimal Python one-liner: no argparse, no site packages, just socket I/O.
+        # Slower (~150ms) but correct everywhere Python is available.
+        python3 -S -c "
+import sys, socket
+_s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+_s.settimeout(5)
+_s.connect(sys.argv[1])
+_s.sendall((sys.argv[2] + '\n').encode())
+_buf = b''
+while b'\n' not in _buf:
+    _c = _s.recv(4096)
+    if not _c:
+        break
+    _buf += _c
+print(_buf.decode().strip())
+_s.close()
+" "$SOCKET_PATH" "$json"
+    fi
+}
+
+# Fire and forget — send JSON, do not wait for a response.
+_send_bg() {
+    local json="$1"
+    [[ -S "$SOCKET_PATH" ]] || _die "esphome-lightsd is not running (socket not found)"
+
+    if command -v socat >/dev/null 2>&1; then
+        printf '%s\n' "$json" | socat - "UNIX-CONNECT:${SOCKET_PATH}" >/dev/null &
+    elif command -v nc >/dev/null 2>&1; then
+        printf '%s\n' "$json" | nc -U "$SOCKET_PATH" >/dev/null &
+    else
+        python3 -S -c "
+import sys, socket
+_s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+_s.settimeout(5)
+_s.connect(sys.argv[1])
+_s.sendall((sys.argv[2] + '\n').encode())
+_s.close()
+" "$SOCKET_PATH" "$json" &
+    fi
+}
+
+# Check whether the JSON response indicates success.
+# Prints the error message to stderr and returns 1 on failure.
+_ok() {
+    local resp="$1"
+    if [[ "$resp" == *'"ok":false'* ]]; then
+        local msg
+        msg="$(printf '%s' "$resp" | sed 's/.*"error":"\([^"]*\)".*/\1/')"
+        printf 'Error: %s\n' "$msg" >&2
+        return 1
+    fi
+    return 0
+}
+
+# Extract the string "result" field from a success response.
+# Only used for commands whose result is a plain JSON string
+# (on/off/brightness/rgb/ping/reload), not nested objects.
+_result() {
+    printf '%s' "$1" | sed 's/.*"result":"\([^"]*\)".*/\1/'
+}
+
+# ---------------------------------------------------------------------------
+# Argument parsing
+# ---------------------------------------------------------------------------
+
+DEVICE=""
+ACTION=""
+VALUE=""
+BACKGROUND=0
+DEBUG=0
+
+[[ $# -gt 0 ]] || { python3 "$(_py_script)" --help; exit 1; }
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --list|--status)
+            # Complex object output — delegate to Python formatter.
+            exec python3 "$(_py_script)" "$1"
+            ;;
+        --ping)
+            RESP="$(_send '{"cmd":"ping"}')"
+            _ok "$RESP" && _result "$RESP"
+            exit $?
+            ;;
+        --reload)
+            RESP="$(_send '{"cmd":"reload"}')"
+            _ok "$RESP" && _result "$RESP"
+            exit $?
+            ;;
+        --device|--set)
+            shift
+            DEVICE="${1:-}"
+            shift || true
+            ;;
+        --on)    ACTION="on";  shift ;;
+        --off)   ACTION="off"; shift ;;
+        --brightness)
+            shift
+            ACTION="brightness"
+            VALUE="${1:-}"
+            shift || true
+            ;;
+        --rgb)
+            shift
+            ACTION="rgb"
+            VALUE="${1:-}"
+            shift || true
+            ;;
+        --bg|--background)
+            BACKGROUND=1
+            shift
+            ;;
+        --debug)
+            # Debug mode needs full JSON output — delegate to Python.
+            exec python3 "$(_py_script)" "$@"
+            ;;
+        --help|-h)
+            exec python3 "$(_py_script)" --help
+            ;;
+        *)
+            _die "Unknown option: $1"
+            ;;
+    esac
+done
+
+# ---------------------------------------------------------------------------
+# Send the set command
+# ---------------------------------------------------------------------------
+
+[[ -n "$DEVICE" ]] || _die "No command given. Use --help for usage."
+[[ -n "$ACTION" ]] || _die "--device requires --on, --off, --brightness, or --rgb"
+
+# Lowercase the device name to match the daemon's key format
+DEVICE="${DEVICE,,}"
+
+if [[ -n "$VALUE" ]]; then
+    JSON="{\"cmd\":\"set\",\"device\":\"${DEVICE}\",\"action\":\"${ACTION}\",\"value\":\"${VALUE}\"}"
+else
+    JSON="{\"cmd\":\"set\",\"device\":\"${DEVICE}\",\"action\":\"${ACTION}\"}"
+fi
+
+if [[ "$BACKGROUND" -eq 1 ]]; then
+    _send_bg "$JSON"
+    printf 'Command sent\n'
+else
+    RESP="$(_send "$JSON")"
+    _ok "$RESP" && _result "$RESP"
+fi
