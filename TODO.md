@@ -202,4 +202,17 @@ next session picks up from here.
 - [x] Copy VERSION file to INSTALL_LIB on every install/upgrade
 - [x] `bash -n` syntax check passes
 - [x] Update README.md, CLAUDE.md, TODO.md, VERSION → 0.2.3
+
+### Phase 9: Installer health checks + OpenClaw workspace skill targeting (v0.2.4)
+
+- [x] Replace OpenClaw skill install block with `_install_openclaw_skill()` helper
+      called from main install path, do_upgrade, and do_repair
+- [x] Skill target selector: [g] Global / [N] per-agent workspace / [o] Other;
+      multiple choices accepted (e.g. `g 1 2`); upgrade/repair refresh existing
+      links silently without re-prompting
+- [x] Broken-install health checks in the existing-install detection block:
+      venv missing, service file missing, broken symlink, aioesphomeapi not
+      importable, service in failed state — defaults menu to Repair if any found
+- [x] Stop running service before overwriting scripts on fresh-over-existing path
+- [x] Update README.md, CLAUDE.md, TODO.md, VERSION → 0.2.4
 - [x] Bump to v0.2.0 (MINOR — shell wrapper milestone + rename)

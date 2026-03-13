@@ -297,6 +297,124 @@ _start_service() {
 }
 
 # ---------------------------------------------------------------------------
+# OpenClaw skill installation helper
+# ---------------------------------------------------------------------------
+
+# Install (or refresh) skill symlinks across whichever OpenClaw targets the
+# user selects.  Called from the main install path, do_upgrade, and do_repair.
+#
+# Behaviour:
+#   - If any skill links already exist (global or per-workspace), they are
+#     refreshed silently — no prompt shown.  Covers upgrade/repair flows.
+#   - If no links exist, the user is offered a multi-select menu:
+#       [g] Global  (~/.openclaw/skills/)         — available to all agents
+#       [N] <name>  (~/.openclaw/workspace-<name>/skills/)  — specific agent
+#       [o] Other   — manual path entry
+#       [n] Skip
+#     Multiple choices are accepted (space- or comma-separated, e.g. "g 1 2").
+#   - In --fast mode with no existing links, defaults to global.
+_install_openclaw_skill() {
+    local _oc_dir="$HOME/.openclaw"
+    [[ -d "$_oc_dir" ]] || return 0
+
+    local _skill_name="esphome-lights"
+    local _global_skills="$_oc_dir/skills"
+
+    # Build sorted list of workspace dirs (workspace, workspace-*, etc.)
+    local -a _workspaces=()
+    for _ws_d in "$_oc_dir"/workspace*/; do
+        _ws_d="${_ws_d%/}"
+        [[ -d "$_ws_d" ]] && _workspaces+=("$_ws_d")
+    done
+
+    # Collect any locations where the skill is already linked.
+    local -a _existing=()
+    [[ -e "$_global_skills/$_skill_name" ]] && _existing+=("$_global_skills")
+    for _ws_d in ${_workspaces[@]+"${_workspaces[@]}"}; do
+        [[ -e "$_ws_d/skills/$_skill_name" ]] && _existing+=("$_ws_d/skills")
+    done
+
+    if [[ ${#_existing[@]} -gt 0 ]]; then
+        # Refresh existing links without prompting (upgrade / repair path).
+        for _target_dir in "${_existing[@]}"; do
+            mkdir -p "$_target_dir"
+            ln -sf "$INSTALL_LIB" "$_target_dir/$_skill_name"
+            ok "OpenClaw skill refreshed: ${_target_dir/#$HOME/~}/$_skill_name"
+        done
+        return 0
+    fi
+
+    # First-time install — offer installation targets.
+    info "OpenClaw detected at ~/.openclaw"
+
+    if [[ $FAST -eq 1 ]]; then
+        mkdir -p "$_global_skills"
+        ln -sf "$INSTALL_LIB" "$_global_skills/$_skill_name"
+        ok "OpenClaw skill linked (global): ~/.openclaw/skills/$_skill_name"
+        return 0
+    fi
+
+    echo
+    echo "  Where should the ESPHome Lights skill be installed?"
+    echo "  (multiple choices allowed, e.g:  g   or   1 2   or   g 2)"
+    echo
+    echo "  [g] Global — ~/.openclaw/skills/  (available to all agents)  [default]"
+    local _i=1
+    for _ws_d in ${_workspaces[@]+"${_workspaces[@]}"}; do
+        printf '  [%d] Agent  — ~/%s/skills/\n' "$_i" "${_ws_d#$HOME/}"
+        _i=$(( _i + 1 ))
+    done
+    echo "  [o] Other  — enter a custom path"
+    echo "  [n] Skip"
+    echo
+    local _oc_choices
+    read -rp "  Choice(s) [g]: " _oc_choices
+    _oc_choices="${_oc_choices:-g}"
+
+    # Split on spaces and commas; process each token.
+    local _tok _idx _ws_skills _custom_dir
+    IFS=', ' read -ra _oc_tokens <<< "$_oc_choices"
+    for _tok in ${_oc_tokens[@]+"${_oc_tokens[@]}"}; do
+        [[ -z "$_tok" ]] && continue
+        case "${_tok,,}" in
+            g|global)
+                mkdir -p "$_global_skills"
+                ln -sf "$INSTALL_LIB" "$_global_skills/$_skill_name"
+                ok "OpenClaw skill linked (global): ~/.openclaw/skills/$_skill_name"
+                ;;
+            [1-9]*)
+                _idx=$(( _tok - 1 ))
+                if [[ "$_idx" -ge 0 ]] && [[ "$_idx" -lt "${#_workspaces[@]}" ]]; then
+                    _ws_skills="${_workspaces[$_idx]}/skills"
+                    mkdir -p "$_ws_skills"
+                    ln -sf "$INSTALL_LIB" "$_ws_skills/$_skill_name"
+                    ok "OpenClaw skill linked: ~/${_ws_skills#$HOME/}/$_skill_name"
+                else
+                    warn "Invalid choice: $_tok (no workspace at that index)"
+                fi
+                ;;
+            o|other)
+                read -rp "  Enter target directory (the skill link will be placed inside it): " _custom_dir
+                _custom_dir="${_custom_dir/#\~/$HOME}"
+                if [[ -n "$_custom_dir" ]]; then
+                    mkdir -p "$_custom_dir"
+                    ln -sf "$INSTALL_LIB" "$_custom_dir/$_skill_name"
+                    ok "OpenClaw skill linked: ${_custom_dir/#$HOME/~}/$_skill_name"
+                else
+                    warn "No path entered — skipped."
+                fi
+                ;;
+            n|no|skip)
+                info "Skipped OpenClaw skill installation."
+                ;;
+            *)
+                warn "Unrecognised choice '${_tok}' — skipped."
+                ;;
+        esac
+    done
+}
+
+# ---------------------------------------------------------------------------
 # Upgrade — pull latest commits, update scripts + packages, restart service
 # ---------------------------------------------------------------------------
 
@@ -330,6 +448,8 @@ do_upgrade() {
     _upgrade_deps
     _write_service_file
     _start_service
+
+    _install_openclaw_skill
 
     if [[ "$OLD_VERSION" == "$NEW_VERSION" ]]; then
         ok "Upgrade complete (v$NEW_VERSION — already up to date)."
@@ -408,6 +528,8 @@ do_repair() {
         || warn "Could not enable loginctl linger."
     systemctl --user enable "$SERVICE_NAME" 2>/dev/null || true
     _start_service
+
+    _install_openclaw_skill
 
     ok "Repair complete (v$NEW_VERSION)."
     echo
@@ -508,14 +630,37 @@ if [[ -f "$INSTALL_LIB/esphome-lightsd.py" ]]; then
         info "Auto-upgrading existing installation (--fast mode) ..."
         do_upgrade
     else
+        # Detect whether the install looks healthy or broken.
+        _broken_reasons=()
+        [[ ! -d "$INSTALL_LIB/venv" ]] \
+            && _broken_reasons+=("venv missing")
+        [[ ! -f "$SERVICE_DIR/$SERVICE_NAME" ]] \
+            && _broken_reasons+=("service file missing")
+        [[ -L "$INSTALL_BIN/esphome-lights" ]] \
+            && [[ ! -e "$INSTALL_BIN/esphome-lights" ]] \
+            && _broken_reasons+=("symlink broken")
+        if "$INSTALL_LIB/venv/bin/python" -c "import aioesphomeapi" 2>/dev/null; then
+            true
+        else
+            _broken_reasons+=("aioesphomeapi not importable")
+        fi
+        [[ $_SVC_FAILED -eq 1 ]] && _broken_reasons+=("service in failed state")
+
+        _default_choice="1"
+        if [[ ${#_broken_reasons[@]} -gt 0 ]]; then
+            warn "Issues detected: ${_broken_reasons[*]}"
+            warn "Repair is recommended."
+            _default_choice="2"
+        fi
+
         echo
-        echo "  [1] Upgrade  (default) — update scripts and packages, restart service"
-        echo "  [2] Repair             — full reinstall of scripts, venv, and service"
-        echo "  [3] Fresh install      — run the full interactive installer"
+        echo "  [1] Upgrade  — update scripts and packages, restart service"
+        echo "  [2] Repair   — full reinstall of scripts, venv, and service"
+        echo "  [3] Fresh    — run the full interactive installer"
         echo "  [q] Cancel"
         echo
-        read -rp "  Choice [1]: " _ei_choice
-        _ei_choice="${_ei_choice:-1}"
+        read -rp "  Choice [$_default_choice]: " _ei_choice
+        _ei_choice="${_ei_choice:-$_default_choice}"
         case "${_ei_choice,,}" in
             1|u|upgrade)   do_upgrade ;;
             2|r|repair)    do_repair  ;;
@@ -529,6 +674,9 @@ fi
 # ---------------------------------------------------------------------------
 # Install scripts
 # ---------------------------------------------------------------------------
+
+# Stop any running daemon before overwriting its script files.
+_stop_service
 
 info "Installing scripts to $INSTALL_LIB ..."
 mkdir -p "$INSTALL_LIB" "$INSTALL_BIN"
@@ -678,24 +826,7 @@ fi
 # OpenClaw skill (optional)
 # ---------------------------------------------------------------------------
 
-OPENCLAW_DIR="$HOME/.openclaw"
-OPENCLAW_SKILLS_DIR="$OPENCLAW_DIR/skills"
-
-if [[ -d "$OPENCLAW_DIR" ]]; then
-    info "OpenClaw detected at ~/.openclaw"
-    SKILL_LINK="$OPENCLAW_SKILLS_DIR/esphome-lights"
-    if [[ -e "$SKILL_LINK" ]]; then
-        # Re-create the symlink in case the target has moved, then confirm update.
-        ln -sf "$INSTALL_LIB" "$SKILL_LINK"
-        ok "OpenClaw skill updated at $SKILL_LINK"
-    else
-        if ask_yn "Install ESPHome Lights as an OpenClaw skill?" "y"; then
-            mkdir -p "$OPENCLAW_SKILLS_DIR"
-            ln -s "$INSTALL_LIB" "$SKILL_LINK"
-            ok "OpenClaw skill linked: $SKILL_LINK -> $INSTALL_LIB"
-        fi
-    fi
-fi
+_install_openclaw_skill
 
 # ---------------------------------------------------------------------------
 # Done

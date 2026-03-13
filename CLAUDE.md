@@ -261,20 +261,26 @@ instructions). Key metadata fields:
 
 ### Installation
 
-`install.sh` handles OpenClaw skill registration automatically. To link
-manually:
+`install.sh` handles OpenClaw skill registration automatically via an
+interactive target selector. Multiple targets can be selected at once.
+To link manually:
 
 ```bash
+# Global (all agents)
 ln -s /path/to/ESPHome-Lights ~/.openclaw/skills/esphome-lights
+
+# Per-agent workspace
+ln -s /path/to/ESPHome-Lights ~/.openclaw/workspace-layla/skills/esphome-lights
 ```
 
 Ensure `ESPHOME_LIGHTS_*` env vars are available to the agent.
 
 ## Current State
 
-- **Version:** 0.2.3
+- **Version:** 0.2.4
 - **Status:** Shell CLI wrapper + daemon architecture. Control commands (on/off/brightness/rgb/ping/reload) achieve sub-10ms response times via socat/nc on ARM.
-- `install.sh` supports `--upgrade` (git pull + update scripts/packages + restart), `--repair` (full reinstall without git pull), and `--uninstall`. Detecting an existing install prompts the user to choose one.
+- `install.sh` supports `--upgrade` (git pull + update scripts/packages + restart), `--repair` (full reinstall without git pull), and `--uninstall`. Detecting an existing install runs health checks (venv, service file, symlinks, aioesphomeapi import) and defaults to Repair if issues are found.
+- OpenClaw skill installer offers Global / per-agent workspace / custom path with multi-select; upgrade/repair refresh existing links silently.
 - The shell wrapper (`esphome-lights`) handles all control commands natively; delegates `--list`/`--status`/`--debug` to `esphome-lights.py`.
 - The Python CLI (`esphome-lights.py`) is retained for complex output formatting and as a universal fallback.
 - The daemon (`esphome-lightsd.py`) maintains persistent connections and serves commands via a Unix domain socket.

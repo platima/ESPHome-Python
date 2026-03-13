@@ -97,7 +97,11 @@ and offers to remove the venv (default: remove) and config dir (default: keep).
 4. Check for a config file and offer to create a template if none exists.
 5. Install and enable a systemd user service (using the venv Python) with the socket at `$XDG_RUNTIME_DIR/esphome-lights.sock`.
 6. Enable `loginctl linger` so the daemon starts at boot without requiring login.
-7. Detect `~/.openclaw` and offer to register the skill if OpenClaw is installed.
+7. Detect `~/.openclaw` and offer to register the skill with a target selector:
+   - **Global** (`~/.openclaw/skills/`) — available to all agents
+   - **Per-agent workspace** (`~/.openclaw/workspace-<name>/skills/`) — one or more agents selected interactively
+   - **Custom path** — manual entry
+   Multiple targets can be selected at once (e.g. `g 1 2`). On upgrade/repair, existing links are refreshed silently.
 8. Warn if `socat`/`nc` are not found (needed for the ~10ms fast path; falls back to Python one-liner at ~150ms).
 
 ## Device Configuration
@@ -340,16 +344,16 @@ translated to CLI commands automatically.
 ### Skill Installation
 
 The `SKILL.md` file at the repository root registers ESPHome Lights as an
-OpenClaw skill. To install:
+OpenClaw skill. `install.sh` handles skill linking automatically with an
+interactive target selector. To link manually:
 
-1. Clone this repository into your OpenClaw workspace's `skills/` directory,
-   or symlink it:
-   ```bash
-   ln -s /path/to/ESPHome-Lights ~/.openclaw/skills/esphome-lights
-   ```
-2. Ensure `ESPHOME_LIGHTS_*` environment variables are available to the
-   OpenClaw agent (via the skill's env config or the agent's environment).
-3. The skill will appear in the agent's skill list automatically.
+```bash
+# Global (available to all agents)
+ln -s /path/to/ESPHome-Lights ~/.openclaw/skills/esphome-lights
+
+# Or per-agent workspace
+ln -s /path/to/ESPHome-Lights ~/.openclaw/workspace-layla/skills/esphome-lights
+```
 
 ### Automation Examples
 
