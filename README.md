@@ -7,7 +7,7 @@ native ESPHome API, designed as an
 [OpenClaw](https://github.com/openclaw/openclaw) skill for
 voice/chat-driven home automation.
 
-**Version:** 0.2.2
+**Version:** 0.2.3
 
 ## Overview
 
@@ -73,15 +73,20 @@ bash install.sh
 
 **Options:**
 
-| Flag          | Effect                                                  |
-|---------------|---------------------------------------------------------|
-| *(none)*      | Interactive install/update                              |
-| `--fast`      | Non-interactive: accept all safe defaults, no prompts   |
-| `--uninstall` | Remove the daemon, scripts, service, and OpenClaw link  |
+| Flag          | Effect                                                             |
+|---------------|--------------------------------------------------------------------|
+| *(none)*      | Interactive install; offers upgrade/repair if already installed    |
+| `--upgrade`   | Pull latest git changes, update scripts + packages, restart service |
+| `--repair`    | Reinstall scripts, venv, and service; recreates venv if missing    |
+| `--fast`      | Non-interactive: accept all safe defaults, no prompts              |
+| `--uninstall` | Remove the daemon, scripts, service, and OpenClaw link             |
 
 The `--fast` flag is useful for scripting or CI. Safe defaults: auto-create
 OpenClaw skill if detected, skip env template if OpenClaw `.env` exists,
-no prompts.
+auto-upgrade if an existing install is detected.
+
+`--upgrade` and `--repair` can also be triggered interactively: when the
+installer detects an existing installation, it prompts you to choose one.
 
 `--uninstall` stops + disables the service, removes scripts and symlinks,
 and offers to remove the venv (default: remove) and config dir (default: keep).

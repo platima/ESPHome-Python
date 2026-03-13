@@ -9,6 +9,7 @@ next session picks up from here.
 
 - [ ] Benchmark daemon performance on the Luckfox Pico target hardware.
 - [ ] Add `--log-file` CLI override flag for ad-hoc log path without env var.
+- [ ] Add shell CLI tests (bash bats or similar) for the socat/nc fast path.
 - [ ] Evaluate Python 3.14 free-threaded support for async performance gains.
 - [ ] Test OpenClaw skill loading against a live OpenClaw agent.
 - [ ] Add shell CLI tests (bash bats or similar) for the socat/nc fast path.
@@ -185,4 +186,20 @@ next session picks up from here.
 - [x] DEBUG log line in `_handle_state()` for state change updates
 - [x] 12 new tests (TestConfigureLogging × 6, TestCommandAuditLogging × 6)
 - [x] Update README.md, CLAUDE.md, TODO.md, VERSION → 0.2.2
+
+### Phase 8: Installer upgrade/repair modes (v0.2.3)
+
+- [x] Add `--upgrade` flag: git pull (if local clone), stop service, update
+      scripts (including VERSION), upgrade pip packages, rewrite service file,
+      start service; show v_old → v_new diff
+- [x] Add `--repair` flag: stop service, reinstall scripts, recreate venv if
+      missing (including pip bootstrap), reinstall/upgrade packages, rewrite
+      service file, enable linger, start service
+- [x] Extract shared helpers: `_stop_service`, `_install_scripts`,
+      `_upgrade_deps`, `_write_service_file`, `_start_service`
+- [x] Main install path detects existing installation and prompts:
+      Upgrade / Repair / Fresh install / Cancel; auto-upgrades in --fast mode
+- [x] Copy VERSION file to INSTALL_LIB on every install/upgrade
+- [x] `bash -n` syntax check passes
+- [x] Update README.md, CLAUDE.md, TODO.md, VERSION → 0.2.3
 - [x] Bump to v0.2.0 (MINOR — shell wrapper milestone + rename)

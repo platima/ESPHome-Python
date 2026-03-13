@@ -13,6 +13,12 @@
 # Or, if you have already cloned the repo:
 #   bash install.sh
 #
+# Upgrade (from a local git clone — run git pull first, or let the flag do it):
+#   bash install.sh --upgrade
+#
+# Repair (reinstall scripts, venv, and service without a git pull):
+#   bash install.sh --repair
+#
 # Uninstall:
 #   bash install.sh --uninstall
 #   bash <(curl -fsSL https://raw.githubusercontent.com/platima/ESPHome-Lights/main/install.sh) --uninstall
@@ -30,14 +36,20 @@
 set -euo pipefail
 
 UNINSTALL=0
+UPGRADE=0
+REPAIR=0
 FAST=0
 for arg in "$@"; do
     case "$arg" in
         --uninstall) UNINSTALL=1 ;;
+        --upgrade)   UPGRADE=1 ;;
+        --repair)    REPAIR=1 ;;
         --fast)      FAST=1 ;;
         -h|--help)
-            echo "Usage: bash install.sh [--uninstall] [--fast]"
-            echo "  (no args)    Install / update ESPHome Lights (interactive)"
+            echo "Usage: bash install.sh [--uninstall | --upgrade | --repair] [--fast]"
+            echo "  (no args)    Install ESPHome Lights; offers upgrade/repair if already installed"
+            echo "  --upgrade    Pull latest changes, update scripts + packages, restart service"
+            echo "  --repair     Reinstall scripts, venv, and service from current source"
             echo "  --uninstall  Remove ESPHome Lights from this system"
             echo "  --fast       Non-interactive: accept all safe defaults"
             exit 0
@@ -192,6 +204,217 @@ do_uninstall() {
 [[ $UNINSTALL -eq 1 ]] && do_uninstall
 
 # ---------------------------------------------------------------------------
+# Shared helpers (upgrade, repair, and the standard install path all use these)
+# ---------------------------------------------------------------------------
+
+# Stop the daemon service if it is currently active.
+_stop_service() {
+    if systemctl --user is-active "$SERVICE_NAME" > /dev/null 2>&1; then
+        info "Stopping $SERVICE_NAME ..."
+        systemctl --user stop "$SERVICE_NAME" \
+            && ok "Service stopped." \
+            || warn "Could not stop service — proceeding anyway."
+    fi
+}
+
+# Copy scripts and VERSION from SOURCE_DIR to INSTALL_LIB and update symlinks.
+_install_scripts() {
+    mkdir -p "$INSTALL_LIB" "$INSTALL_BIN"
+    cp "$SOURCE_DIR/esphome-lights"     "$INSTALL_LIB/"
+    cp "$SOURCE_DIR/esphome-lights.py"  "$INSTALL_LIB/"
+    cp "$SOURCE_DIR/esphome-lightsd.py" "$INSTALL_LIB/"
+    cp "$SOURCE_DIR/SKILL.md"           "$INSTALL_LIB/"
+    cp "$SOURCE_DIR/VERSION"            "$INSTALL_LIB/"
+    chmod +x "$INSTALL_LIB/esphome-lights" \
+             "$INSTALL_LIB/esphome-lights.py" \
+             "$INSTALL_LIB/esphome-lightsd.py"
+    ln -sf "$INSTALL_LIB/esphome-lights"     "$INSTALL_BIN/esphome-lights"
+    ln -sf "$INSTALL_LIB/esphome-lightsd.py" "$INSTALL_BIN/esphome-lightsd"
+    ok "Scripts installed (v$(cat "$INSTALL_LIB/VERSION" 2>/dev/null || echo "unknown"))."
+    if [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
+        warn "$HOME/.local/bin is not in your PATH."
+        warn "Add this to your shell profile (~/.profile, ~/.bashrc, etc.):"
+        warn "  export PATH=\"\$HOME/.local/bin:\$PATH\""
+    fi
+}
+
+# Upgrade pip packages in an existing venv.
+_upgrade_deps() {
+    local _venv_py="$INSTALL_LIB/venv/bin/python"
+    [[ -f "$_venv_py" ]] \
+        || die "venv not found at $INSTALL_LIB/venv — use --repair to recreate it."
+    info "Upgrading packages in venv ..."
+    "$_venv_py" -m pip install --upgrade pip --quiet
+    "$_venv_py" -m pip install --upgrade aioesphomeapi --quiet \
+        || die "Failed to upgrade aioesphomeapi."
+    # Force-reinstall noiseprotocol: 'noise' (Perlin) installs to the same
+    # directory and silently breaks Noise encryption if left in place.
+    "$_venv_py" -m pip install --force-reinstall noiseprotocol --quiet \
+        && ok "Packages upgraded." \
+        || warn "noiseprotocol reinstall failed — encryption may not work."
+}
+
+# Write (or rewrite) the systemd service unit file and reload daemon config.
+_write_service_file() {
+    local _venv_py="$INSTALL_LIB/venv/bin/python"
+    mkdir -p "$SERVICE_DIR"
+    cat > "$SERVICE_DIR/$SERVICE_NAME" << EOF
+[Unit]
+Description=ESPHome Lights Daemon
+Documentation=https://github.com/platima/ESPHome-Lights
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=$_venv_py $INSTALL_LIB/esphome-lightsd.py
+WorkingDirectory=$INSTALL_LIB
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target
+EOF
+    systemctl --user daemon-reload
+    systemctl --user enable "$SERVICE_NAME" \
+        && ok "Service enabled: $SERVICE_NAME" \
+        || warn "Could not enable service. Enable manually: systemctl --user enable $SERVICE_NAME"
+}
+
+# Start the service, or restart it if already running.
+_start_service() {
+    if systemctl --user is-active "$SERVICE_NAME" > /dev/null 2>&1; then
+        info "Restarting $SERVICE_NAME ..."
+        systemctl --user restart "$SERVICE_NAME" \
+            && ok "Service restarted." \
+            || warn "Could not restart service. Try: systemctl --user restart $SERVICE_NAME"
+    else
+        info "Starting $SERVICE_NAME ..."
+        systemctl --user start "$SERVICE_NAME" \
+            && ok "Service started." \
+            || warn "Could not start service. Try: systemctl --user start $SERVICE_NAME"
+    fi
+}
+
+# ---------------------------------------------------------------------------
+# Upgrade — pull latest commits, update scripts + packages, restart service
+# ---------------------------------------------------------------------------
+
+do_upgrade() {
+    echo
+    info "ESPHome Lights — upgrade"
+    echo
+    [[ $EUID -ne 0 ]] || die "Do not run this installer as root or with sudo."
+
+    if [[ ! -f "$INSTALL_LIB/esphome-lightsd.py" ]]; then
+        die "No existing installation found at $INSTALL_LIB. Run install.sh without --upgrade first."
+    fi
+
+    OLD_VERSION="$(cat "$INSTALL_LIB/VERSION" 2>/dev/null || echo "unknown")"
+    info "Installed version: v$OLD_VERSION"
+
+    # Pull latest commits when running from a local git clone.
+    if [[ -n "${SCRIPT_DIR:-}" ]] \
+            && git -C "$SCRIPT_DIR" rev-parse --git-dir > /dev/null 2>&1; then
+        info "Pulling latest changes from git ..."
+        git -C "$SCRIPT_DIR" pull \
+            && ok "Repository updated." \
+            || warn "git pull failed — upgrading from current working tree."
+    else
+        warn "Source is not a git repository — upgrading from current source files."
+    fi
+
+    NEW_VERSION="$(cat "$SOURCE_DIR/VERSION" 2>/dev/null || echo "unknown")"
+    _stop_service
+    _install_scripts
+    _upgrade_deps
+    _write_service_file
+    _start_service
+
+    if [[ "$OLD_VERSION" == "$NEW_VERSION" ]]; then
+        ok "Upgrade complete (v$NEW_VERSION — already up to date)."
+    else
+        ok "Upgrade complete: v$OLD_VERSION → v$NEW_VERSION"
+    fi
+    echo
+    exit 0
+}
+
+# ---------------------------------------------------------------------------
+# Repair — reinstall scripts, venv, and service from the current source tree
+# ---------------------------------------------------------------------------
+
+do_repair() {
+    echo
+    info "ESPHome Lights — repair"
+    info "Reinstalling scripts, dependencies, and systemd service."
+    echo
+    [[ $EUID -ne 0 ]] || die "Do not run this installer as root or with sudo."
+
+    OLD_VERSION="$(cat "$INSTALL_LIB/VERSION" 2>/dev/null || echo "unknown")"
+    NEW_VERSION="$(cat "$SOURCE_DIR/VERSION" 2>/dev/null || echo "unknown")"
+    info "Installed: v$OLD_VERSION  Source: v$NEW_VERSION"
+
+    _stop_service
+    _install_scripts
+
+    # Re-create the venv if missing; otherwise just upgrade packages.
+    local _venv_dir="$INSTALL_LIB/venv"
+    local _venv_py="$_venv_dir/bin/python"
+    if [[ ! -d "$_venv_dir" ]]; then
+        info "venv not found — creating Python 3.11 venv ..."
+        if "$PYTHON311" -m venv --upgrade-deps "$_venv_dir" > /dev/null 2>&1; then
+            ok "Venv created."
+        elif "$PYTHON311" -m venv --without-pip "$_venv_dir" > /dev/null 2>&1; then
+            ok "Venv created (pip will be bootstrapped) ..."
+        else
+            die "Failed to create Python 3.11 venv. Is python3.11 installed correctly?"
+        fi
+        # Bootstrap pip if the venv was created without it (Debian default).
+        if [[ ! -f "$_venv_dir/bin/pip" ]]; then
+            if "$_venv_py" -m ensurepip --upgrade 2>/dev/null; then
+                ok "pip bootstrapped."
+            else
+                warn "ensurepip unavailable — downloading get-pip.py ..."
+                local _getpip; _getpip="$(mktemp)"
+                if command -v curl > /dev/null 2>&1; then
+                    curl -fsSL https://bootstrap.pypa.io/get-pip.py -o "$_getpip"
+                elif command -v wget > /dev/null 2>&1; then
+                    wget -qO "$_getpip" https://bootstrap.pypa.io/get-pip.py
+                else
+                    die "curl/wget not found and ensurepip unavailable. Install pip manually."
+                fi
+                "$_venv_py" "$_getpip" --quiet \
+                    || die "Failed to install pip. Try: sudo apt install python3-pip"
+                rm -f "$_getpip"
+                ok "pip bootstrapped via get-pip.py."
+            fi
+        fi
+        # Initial package install into the fresh venv.
+        info "Installing aioesphomeapi ..."
+        "$_venv_py" -m pip install --upgrade pip --quiet
+        "$_venv_py" -m pip install aioesphomeapi --quiet \
+            || die "pip install failed. Try: $_venv_py -m pip install aioesphomeapi"
+        "$_venv_py" -m pip install --force-reinstall noiseprotocol --quiet \
+            && ok "aioesphomeapi installed." \
+            || warn "noiseprotocol reinstall failed — encryption may not work."
+    else
+        _upgrade_deps
+    fi
+
+    _write_service_file
+    loginctl enable-linger "$USER" 2>/dev/null \
+        && ok "loginctl linger enabled." \
+        || warn "Could not enable loginctl linger."
+    systemctl --user enable "$SERVICE_NAME" 2>/dev/null || true
+    _start_service
+
+    ok "Repair complete (v$NEW_VERSION)."
+    echo
+    exit 0
+}
+
+# ---------------------------------------------------------------------------
 # Pre-flight checks
 # ---------------------------------------------------------------------------
 
@@ -259,6 +482,51 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# Dispatch explicit --upgrade / --repair (needs SOURCE_DIR resolved first)
+# ---------------------------------------------------------------------------
+
+[[ $UPGRADE -eq 1 ]] && do_upgrade
+[[ $REPAIR  -eq 1 ]] && do_repair
+
+# ---------------------------------------------------------------------------
+# Detect existing installation and offer upgrade / repair / fresh install
+# ---------------------------------------------------------------------------
+
+if [[ -f "$INSTALL_LIB/esphome-lightsd.py" ]]; then
+    _OLD_VER="$(cat "$INSTALL_LIB/VERSION" 2>/dev/null || echo "unknown")"
+    _NEW_VER="$(cat "$SOURCE_DIR/VERSION"   2>/dev/null || echo "unknown")"
+    _SVC_FAILED=0
+    systemctl --user is-failed "$SERVICE_NAME" > /dev/null 2>&1 \
+        && _SVC_FAILED=1 || true
+
+    echo
+    info "Existing installation detected (v$_OLD_VER) — source v$_NEW_VER"
+    [[ $_SVC_FAILED -eq 1 ]] \
+        && warn "Service is in a failed state — Repair is recommended."
+
+    if [[ $FAST -eq 1 ]]; then
+        info "Auto-upgrading existing installation (--fast mode) ..."
+        do_upgrade
+    else
+        echo
+        echo "  [1] Upgrade  (default) — update scripts and packages, restart service"
+        echo "  [2] Repair             — full reinstall of scripts, venv, and service"
+        echo "  [3] Fresh install      — run the full interactive installer"
+        echo "  [q] Cancel"
+        echo
+        read -rp "  Choice [1]: " _ei_choice
+        _ei_choice="${_ei_choice:-1}"
+        case "${_ei_choice,,}" in
+            1|u|upgrade)   do_upgrade ;;
+            2|r|repair)    do_repair  ;;
+            3|f|fresh)     info "Continuing with full installer ..." ;;
+            q|quit|cancel) info "Cancelled."; exit 0 ;;
+            *)             warn "Unrecognised choice — defaulting to upgrade."; do_upgrade ;;
+        esac
+    fi
+fi
+
+# ---------------------------------------------------------------------------
 # Install scripts
 # ---------------------------------------------------------------------------
 
@@ -268,16 +536,17 @@ cp "$SOURCE_DIR/esphome-lights"     "$INSTALL_LIB/"
 cp "$SOURCE_DIR/esphome-lights.py"  "$INSTALL_LIB/"
 cp "$SOURCE_DIR/esphome-lightsd.py" "$INSTALL_LIB/"
 cp "$SOURCE_DIR/SKILL.md"           "$INSTALL_LIB/"
+cp "$SOURCE_DIR/VERSION"            "$INSTALL_LIB/"
 chmod +x "$INSTALL_LIB/esphome-lights" \
          "$INSTALL_LIB/esphome-lights.py" \
          "$INSTALL_LIB/esphome-lightsd.py"
 
 # Symlinks in ~/.local/bin so the commands are on PATH.
-# esphome-lights -> shell wrapper (fast, ~10ms via socat/nc)
+# esphome-lights  -> shell wrapper (fast path: socat/nc, ~10ms)
 # esphome-lightsd -> Python daemon
 ln -sf "$INSTALL_LIB/esphome-lights"    "$INSTALL_BIN/esphome-lights"
 ln -sf "$INSTALL_LIB/esphome-lightsd.py" "$INSTALL_BIN/esphome-lightsd"
-ok "Scripts installed."
+ok "Scripts installed (v$(cat "$INSTALL_LIB/VERSION" 2>/dev/null || echo "unknown"))."
 
 # Warn if ~/.local/bin is not on PATH
 if [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
@@ -387,49 +656,12 @@ fi
 # ---------------------------------------------------------------------------
 
 info "Installing systemd user service ..."
-mkdir -p "$SERVICE_DIR"
-
-# Socket lives under $XDG_RUNTIME_DIR (tmpfs, auto-created by systemd per-user).
-# In the service file, %t expands to $XDG_RUNTIME_DIR at runtime.
-SOCKET_PATH_DISPLAY="\$XDG_RUNTIME_DIR/esphome-lights.sock"
-
-cat > "$SERVICE_DIR/$SERVICE_NAME" << EOF
-[Unit]
-Description=ESPHome Lights Daemon
-Documentation=https://github.com/platima/ESPHome-Lights
-After=network-online.target
-Wants=network-online.target
-
-[Service]
-Type=simple
-ExecStart=$VENV_PYTHON $INSTALL_LIB/esphome-lightsd.py
-WorkingDirectory=$INSTALL_LIB
-Restart=on-failure
-RestartSec=5
-
-[Install]
-WantedBy=default.target
-EOF
-
-systemctl --user daemon-reload
-systemctl --user enable "$SERVICE_NAME" \
-    && ok "Service enabled: $SERVICE_NAME" \
-    || warn "Could not enable service automatically. Enable manually: systemctl --user enable $SERVICE_NAME"
+_write_service_file
 
 # Explicitly start (or restart on update) the service so state is always
 # intentional and visible. Without this, systemd silently auto-starts the
 # service during 'enable' when linger is active and default.target is met.
-if systemctl --user is-active "$SERVICE_NAME" > /dev/null 2>&1; then
-    info "Restarting $SERVICE_NAME ..."
-    systemctl --user restart "$SERVICE_NAME" \
-        && ok "Service restarted." \
-        || warn "Could not restart service. Restart manually: systemctl --user restart $SERVICE_NAME"
-else
-    info "Starting $SERVICE_NAME ..."
-    systemctl --user start "$SERVICE_NAME" \
-        && ok "Service started." \
-        || warn "Could not start service. Start manually: systemctl --user start $SERVICE_NAME"
-fi
+_start_service
 
 # Enable linger: keeps the user session alive at boot so the service
 # starts without requiring the user to be logged in.
@@ -483,5 +715,6 @@ echo "  esphome-lights --reload"
 echo "  (or: systemctl --user kill -s HUP $SERVICE_NAME)"
 echo
 info "To view daemon logs:  journalctl --user -u $SERVICE_NAME -f"
-info "To update:            re-run this installer"
+info "To upgrade:           bash install.sh --upgrade   (git pull + update)"
+info "To repair:            bash install.sh --repair    (full reinstall, no git pull)"
 echo
