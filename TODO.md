@@ -255,3 +255,11 @@ next session picks up from here.
       directory, `ln` created the link INSIDE the directory, overwriting
       the shell wrapper file with a symlink back to the parent dir
 - [x] Update CLAUDE.md, TODO.md, VERSION → 0.3.4
+
+### Chore: ASCII-only installer output (v0.3.5)
+
+- [x] Replaced all Unicode characters in user-visible output with ASCII
+      equivalents (em dash → `--`, arrow → `->`, cross → `x`)
+- [x] Terminal on Luckfox Pico rendered `→` as `_` due to locale/font
+- [x] Comments left unchanged (not rendered to terminal)
+- [x] Update CLAUDE.md, TODO.md, VERSION → 0.3.5

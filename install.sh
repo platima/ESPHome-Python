@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# install.sh — ESPHome Lights user-level installer
+# install.sh -- ESPHome Lights user-level installer
 # =============================================================================
 #
 # Installs the ESPHome Lights daemon and CLI as a systemd user service.
@@ -13,7 +13,7 @@
 # Or, if you have already cloned the repo:
 #   bash install.sh
 #
-# Upgrade (from a local git clone — run git pull first, or let the flag do it):
+# Upgrade (from a local git clone -- run git pull first, or let the flag do it):
 #   bash install.sh --upgrade
 #
 # Repair (reinstall scripts, venv, and service without a git pull):
@@ -72,9 +72,9 @@ SERVICE_NAME="esphome-lightsd.service"
 info()  { printf '\033[1;34m[*]\033[0m %s\n' "$*"; }
 ok()    { printf '\033[1;32m[+]\033[0m %s\n' "$*"; }
 warn()  { printf '\033[1;33m[!]\033[0m %s\n' "$*"; }
-die()   { printf '\033[1;31m[✗]\033[0m %s\n' "$*" >&2; exit 1; }
+die()   { printf '\033[1;31m[x]\033[0m %s\n' "$*" >&2; exit 1; }
 
-# Prompt y/n — defaults to the given default if stdin is not a terminal
+# Prompt y/n -- defaults to the given default if stdin is not a terminal
 # (non-interactive) or if --fast was passed.
 ask_yn() {
     local prompt="$1" default="${2:-n}"
@@ -195,7 +195,7 @@ do_uninstall() {
 
     ok "Uninstall complete."
     if [[ $KEEP_VENV -eq 1 && -d "$VENV_DIR" ]]; then
-        info "Venv retained at $VENV_DIR — re-run the installer to restore everything."
+        info "Venv retained at $VENV_DIR -- re-run the installer to restore everything."
     fi
     echo
     exit 0
@@ -213,7 +213,7 @@ _stop_service() {
         info "Stopping $SERVICE_NAME ..."
         systemctl --user stop "$SERVICE_NAME" \
             && ok "Service stopped." \
-            || warn "Could not stop service — proceeding anyway."
+            || warn "Could not stop service -- proceeding anyway."
     fi
 }
 
@@ -244,9 +244,9 @@ _install_scripts() {
     local _f
     for _f in esphome-lights esphome-lights.py esphome-lightsd.py; do
         if [[ ! -f "$INSTALL_LIB/$_f" ]]; then
-            warn "$INSTALL_LIB/$_f is not a regular file — installation may be broken."
+            warn "$INSTALL_LIB/$_f is not a regular file -- installation may be broken."
         elif [[ ! -x "$INSTALL_LIB/$_f" ]]; then
-            warn "$INSTALL_LIB/$_f is not executable — fixing permissions."
+            warn "$INSTALL_LIB/$_f is not executable -- fixing permissions."
             chmod +x "$INSTALL_LIB/$_f"
         fi
     done
@@ -262,7 +262,7 @@ _install_scripts() {
 _upgrade_deps() {
     local _venv_py="$INSTALL_LIB/venv/bin/python"
     [[ -f "$_venv_py" ]] \
-        || die "venv not found at $INSTALL_LIB/venv — use --repair to recreate it."
+        || die "venv not found at $INSTALL_LIB/venv -- use --repair to recreate it."
     info "Upgrading packages in venv ..."
     "$_venv_py" -m pip install --upgrade pip --quiet
     "$_venv_py" -m pip install --upgrade aioesphomeapi --quiet \
@@ -271,7 +271,7 @@ _upgrade_deps() {
     # directory and silently breaks Noise encryption if left in place.
     "$_venv_py" -m pip install --force-reinstall noiseprotocol --quiet \
         && ok "Packages upgraded." \
-        || warn "noiseprotocol reinstall failed — encryption may not work."
+        || warn "noiseprotocol reinstall failed -- encryption may not work."
 }
 
 # Write (or rewrite) the systemd service unit file and reload daemon config.
@@ -325,11 +325,11 @@ _start_service() {
 #
 # Behaviour:
 #   - If any skill links already exist (global or per-workspace), they are
-#     refreshed silently — no prompt shown.  Covers upgrade/repair flows.
+#     refreshed silently -- no prompt shown.  Covers upgrade/repair flows.
 #   - If no links exist, the user is offered a multi-select menu:
-#       [g] Global  (~/.openclaw/skills/)         — available to all agents
-#       [N] <name>  (~/.openclaw/workspace-<name>/skills/)  — specific agent
-#       [o] Other   — manual path entry
+#       [g] Global  (~/.openclaw/skills/)         -- available to all agents
+#       [N] <name>  (~/.openclaw/workspace-<name>/skills/)  -- specific agent
+#       [o] Other   -- manual path entry
 #       [n] Skip
 #     Multiple choices are accepted (space- or comma-separated, e.g. "g 1 2").
 #   - In --fast mode with no existing links, defaults to global.
@@ -364,7 +364,7 @@ _install_openclaw_skill() {
         return 0
     fi
 
-    # First-time install — offer installation targets.
+    # First-time install -- offer installation targets.
     info "OpenClaw detected at ~/.openclaw"
 
     if [[ $FAST -eq 1 ]]; then
@@ -378,13 +378,13 @@ _install_openclaw_skill() {
     echo "  Where should the ESPHome Lights skill be installed?"
     echo "  (multiple choices allowed, e.g:  g   or   1 2   or   g 2)"
     echo
-    echo "  [g] Global — ~/.openclaw/skills/  (available to all agents)  [default]"
+    echo "  [g] Global -- ~/.openclaw/skills/  (available to all agents)  [default]"
     local _i=1
     for _ws_d in ${_workspaces[@]+"${_workspaces[@]}"}; do
-        printf '  [%d] Agent  — ~/%s/skills/\n' "$_i" "${_ws_d#$HOME/}"
+        printf '  [%d] Agent  -- ~/%s/skills/\n' "$_i" "${_ws_d#$HOME/}"
         _i=$(( _i + 1 ))
     done
-    echo "  [o] Other  — enter a custom path"
+    echo "  [o] Other  -- enter a custom path"
     echo "  [n] Skip"
     echo
     local _oc_choices
@@ -421,26 +421,26 @@ _install_openclaw_skill() {
                     ln -sfn "$INSTALL_LIB" "$_custom_dir/$_skill_name"
                     ok "OpenClaw skill linked: ${_custom_dir/#$HOME/~}/$_skill_name"
                 else
-                    warn "No path entered — skipped."
+                    warn "No path entered -- skipped."
                 fi
                 ;;
             n|no|skip)
                 info "Skipped OpenClaw skill installation."
                 ;;
             *)
-                warn "Unrecognised choice '${_tok}' — skipped."
+                warn "Unrecognised choice '${_tok}' -- skipped."
                 ;;
         esac
     done
 }
 
 # ---------------------------------------------------------------------------
-# Upgrade — pull latest commits, update scripts + packages, restart service
+# Upgrade -- pull latest commits, update scripts + packages, restart service
 # ---------------------------------------------------------------------------
 
 do_upgrade() {
     echo
-    info "ESPHome Lights — upgrade"
+    info "ESPHome Lights -- upgrade"
     echo
     [[ $EUID -ne 0 ]] || die "Do not run this installer as root or with sudo."
 
@@ -457,7 +457,7 @@ do_upgrade() {
         info "Pulling latest changes from git ..."
         git -C "$SCRIPT_DIR" pull \
             && ok "Repository updated." \
-            || warn "git pull failed — upgrading from current working tree."
+            || warn "git pull failed -- upgrading from current working tree."
 
         # Re-exec with the updated install.sh so that any fixes to the
         # installer itself take effect immediately (e.g. new cleanup logic
@@ -472,7 +472,7 @@ do_upgrade() {
             exec bash "$SCRIPT_DIR/install.sh" "${_reexec_args[@]}"
         fi
     else
-        warn "Source is not a git repository — upgrading from current source files."
+        warn "Source is not a git repository -- upgrading from current source files."
     fi
 
     NEW_VERSION="$(cat "$SOURCE_DIR/VERSION" 2>/dev/null || echo "unknown")"
@@ -485,21 +485,21 @@ do_upgrade() {
     _install_openclaw_skill
 
     if [[ "$OLD_VERSION" == "$NEW_VERSION" ]]; then
-        ok "Upgrade complete (v$NEW_VERSION — already up to date)."
+        ok "Upgrade complete (v$NEW_VERSION -- already up to date)."
     else
-        ok "Upgrade complete: v$OLD_VERSION → v$NEW_VERSION"
+        ok "Upgrade complete: v$OLD_VERSION -> v$NEW_VERSION"
     fi
     echo
     exit 0
 }
 
 # ---------------------------------------------------------------------------
-# Repair — reinstall scripts, venv, and service from the current source tree
+# Repair -- reinstall scripts, venv, and service from the current source tree
 # ---------------------------------------------------------------------------
 
 do_repair() {
     echo
-    info "ESPHome Lights — repair"
+    info "ESPHome Lights -- repair"
     info "Reinstalling scripts, dependencies, and systemd service."
     echo
     [[ $EUID -ne 0 ]] || die "Do not run this installer as root or with sudo."
@@ -515,7 +515,7 @@ do_repair() {
     local _venv_dir="$INSTALL_LIB/venv"
     local _venv_py="$_venv_dir/bin/python"
     if [[ ! -d "$_venv_dir" ]]; then
-        info "venv not found — creating Python 3.11 venv ..."
+        info "venv not found -- creating Python 3.11 venv ..."
         if "$PYTHON311" -m venv --upgrade-deps "$_venv_dir" > /dev/null 2>&1; then
             ok "Venv created."
         elif "$PYTHON311" -m venv --without-pip "$_venv_dir" > /dev/null 2>&1; then
@@ -528,7 +528,7 @@ do_repair() {
             if "$_venv_py" -m ensurepip --upgrade 2>/dev/null; then
                 ok "pip bootstrapped."
             else
-                warn "ensurepip unavailable — downloading get-pip.py ..."
+                warn "ensurepip unavailable -- downloading get-pip.py ..."
                 local _getpip; _getpip="$(mktemp)"
                 if command -v curl > /dev/null 2>&1; then
                     curl -fsSL https://bootstrap.pypa.io/get-pip.py -o "$_getpip"
@@ -550,7 +550,7 @@ do_repair() {
             || die "pip install failed. Try: $_venv_py -m pip install aioesphomeapi"
         "$_venv_py" -m pip install --force-reinstall noiseprotocol --quiet \
             && ok "aioesphomeapi installed." \
-            || warn "noiseprotocol reinstall failed — encryption may not work."
+            || warn "noiseprotocol reinstall failed -- encryption may not work."
     else
         _upgrade_deps
     fi
@@ -583,7 +583,7 @@ info "ESPHome Lights installer"
 systemctl --user status > /dev/null 2>&1 \
     || die "systemd user session not available. Is systemd running?\n  Hint: try 'systemctl --user status' to diagnose."
 
-# 3. Python 3.11 — required for the daemon (aioesphomeapi + Noise encryption
+# 3. Python 3.11 -- required for the daemon (aioesphomeapi + Noise encryption
 #    has compatibility issues with Python 3.12/3.13 on ARM targets).
 #    The CLI shell wrapper uses bash + socat/nc; Python is only needed for
 #    the daemon and for --list/--status output formatting.
@@ -599,13 +599,13 @@ if [[ -z "$PYTHON311" ]]; then
 fi
 info "Using Python 3.11: $PYTHON311  ($($PYTHON311 --version 2>&1))"
 
-# 4. socat / nc — needed for the fast CLI path (~10ms on ARM).
+# 4. socat / nc -- needed for the fast CLI path (~10ms on ARM).
 #    Falls back to a Python one-liner (~150ms) if neither is available.
 #    Cannot be installed without sudo; just warn so the user can act.
 if command -v socat >/dev/null 2>&1; then
-    ok "socat found — CLI will use fast socket path (~10ms)."
+    ok "socat found -- CLI will use fast socket path (~10ms)."
 elif command -v nc >/dev/null 2>&1; then
-    ok "nc found — CLI will use fast socket path (~10ms)."
+    ok "nc found -- CLI will use fast socket path (~10ms)."
 else
     warn "Neither socat nor nc found. CLI will fall back to Python one-liner (~150ms)."
     warn "For best performance, install socat: apt/dnf install socat"
@@ -655,9 +655,9 @@ if [[ -f "$INSTALL_LIB/esphome-lightsd.py" ]]; then
         && _SVC_FAILED=1 || true
 
     echo
-    info "Existing installation detected (v$_OLD_VER) — source v$_NEW_VER"
+    info "Existing installation detected (v$_OLD_VER) -- source v$_NEW_VER"
     [[ $_SVC_FAILED -eq 1 ]] \
-        && warn "Service is in a failed state — Repair is recommended."
+        && warn "Service is in a failed state -- Repair is recommended."
 
     if [[ $FAST -eq 1 ]]; then
         info "Auto-upgrading existing installation (--fast mode) ..."
@@ -687,9 +687,9 @@ if [[ -f "$INSTALL_LIB/esphome-lightsd.py" ]]; then
         fi
 
         echo
-        echo "  [1] Upgrade  — update scripts and packages, restart service"
-        echo "  [2] Repair   — full reinstall of scripts, venv, and service"
-        echo "  [3] Fresh    — run the full interactive installer"
+        echo "  [1] Upgrade  -- update scripts and packages, restart service"
+        echo "  [2] Repair   -- full reinstall of scripts, venv, and service"
+        echo "  [3] Fresh    -- run the full interactive installer"
         echo "  [q] Cancel"
         echo
         read -rp "  Choice [$_default_choice]: " _ei_choice
@@ -699,7 +699,7 @@ if [[ -f "$INSTALL_LIB/esphome-lightsd.py" ]]; then
             2|r|repair)    do_repair  ;;
             3|f|fresh)     info "Continuing with full installer ..." ;;
             q|quit|cancel) info "Cancelled."; exit 0 ;;
-            *)             warn "Unrecognised choice — defaulting to upgrade."; do_upgrade ;;
+            *)             warn "Unrecognised choice -- defaulting to upgrade."; do_upgrade ;;
         esac
     fi
 fi
@@ -730,7 +730,7 @@ else
     elif "$PYTHON311" -m venv --without-pip "$VENV_DIR" > /dev/null 2>&1; then
         # ensurepip is stripped on this system (Debian without python3.11-venv).
         # --without-pip skips ensurepip entirely; pip is bootstrapped via
-        # get-pip.py in the next step — no sudo required.
+        # get-pip.py in the next step -- no sudo required.
         ok "Venv created (pip will be bootstrapped below)."
     else
         die "Failed to create Python 3.11 venv. Check that python3.11 is installed correctly."
