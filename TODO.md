@@ -236,3 +236,12 @@ next session picks up from here.
 - [x] Main install path refactored to call `_install_scripts()` instead of
       duplicating cp commands (DRY)
 - [x] Update CLAUDE.md, TODO.md, VERSION → 0.3.2
+
+### Fix: upgrade re-execs installer after git pull (v0.3.3)
+
+- [x] `do_upgrade()` re-execs itself after `git pull` so fixes to
+      `install.sh` take effect immediately (env var guard prevents loops;
+      `--fast` flag preserved across re-exec)
+- [x] `_install_scripts()` post-copy validation: warns if installed files
+      are not regular files or missing execute permission
+- [x] Update README.md, CLAUDE.md, TODO.md, VERSION → 0.3.3

@@ -239,6 +239,17 @@ _install_scripts() {
              "$INSTALL_LIB/esphome-lightsd.py"
     ln -sf "$INSTALL_LIB/esphome-lights"     "$INSTALL_BIN/esphome-lights"
     ln -sf "$INSTALL_LIB/esphome-lightsd.py" "$INSTALL_BIN/esphome-lightsd"
+    # Post-install sanity check: verify key files are regular files.
+    # Catches stale directories, broken symlinks, or failed copies.
+    local _f
+    for _f in esphome-lights esphome-lights.py esphome-lightsd.py; do
+        if [[ ! -f "$INSTALL_LIB/$_f" ]]; then
+            warn "$INSTALL_LIB/$_f is not a regular file — installation may be broken."
+        elif [[ ! -x "$INSTALL_LIB/$_f" ]]; then
+            warn "$INSTALL_LIB/$_f is not executable — fixing permissions."
+            chmod +x "$INSTALL_LIB/$_f"
+        fi
+    done
     ok "Scripts installed (v$(cat "$INSTALL_LIB/VERSION" 2>/dev/null || echo "unknown"))."
     if [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
         warn "$HOME/.local/bin is not in your PATH."
@@ -447,6 +458,19 @@ do_upgrade() {
         git -C "$SCRIPT_DIR" pull \
             && ok "Repository updated." \
             || warn "git pull failed — upgrading from current working tree."
+
+        # Re-exec with the updated install.sh so that any fixes to the
+        # installer itself take effect immediately (e.g. new cleanup logic
+        # in _install_scripts).  The _ESPHOME_REEXEC env var prevents an
+        # infinite loop if for some reason the on-disk script is identical.
+        if [[ -z "${_ESPHOME_REEXEC:-}" ]] \
+                && [[ -f "$SCRIPT_DIR/install.sh" ]]; then
+            info "Re-executing updated installer ..."
+            local _reexec_args=(--upgrade)
+            [[ $FAST -eq 1 ]] && _reexec_args+=(--fast)
+            export _ESPHOME_REEXEC=1
+            exec bash "$SCRIPT_DIR/install.sh" "${_reexec_args[@]}"
+        fi
     else
         warn "Source is not a git repository — upgrading from current source files."
     fi
