@@ -245,7 +245,7 @@ class DeviceManager:
         """Establish a connection to a single device."""
         cfg = self._devices[name]
         self._conn_state[name] = "connecting"
-        log.info("Connecting to %s (%s:%s)…", name, cfg["host"], cfg["port"])
+        log.info("Connecting to %s (%s:%s)...", name, cfg["host"], cfg["port"])
 
         # on_stop is the modern aioesphomeapi callback (replaces set_on_disconnect)
         async def _on_stop(expected_disconnect: bool):
@@ -361,7 +361,7 @@ class DeviceManager:
         """Retry connecting with exponential backoff."""
         delay = RECONNECT_MIN
         while True:
-            log.info("Reconnecting to %s in %ss…", name, delay)
+            log.info("Reconnecting to %s in %ss...", name, delay)
             await asyncio.sleep(delay)
             try:
                 await self._connect(name)
@@ -541,7 +541,7 @@ class DeviceManager:
 def _audit_cmd(cmd: str, request: dict, response: dict):
     """Log a single-line audit entry for every dispatched command.
 
-    Format:  cmd=<cmd> [device=<d>] [action=<a>] [value=<v>] → ok|error: <msg>
+    Format:  cmd=<cmd> [device=<d>] [action=<a>] [value=<v>] -> ok|error: <msg>
     Long results (e.g. list/status payloads) are truncated to 120 characters.
     """
     parts = [f"cmd={cmd}"]
@@ -556,9 +556,9 @@ def _audit_cmd(cmd: str, request: dict, response: dict):
         result_str = str(response.get("result", ""))
         if len(result_str) > 120:
             result_str = result_str[:117] + "..."
-        log.info("%s → ok: %s", prefix, result_str)
+        log.info("%s -> ok: %s", prefix, result_str)
     else:
-        log.info("%s → error: %s", prefix, response.get("error", ""))
+        log.info("%s -> error: %s", prefix, response.get("error", ""))
 
 
 # ---------------------------------------------------------------------------
@@ -696,7 +696,7 @@ async def main():
         sys.exit(1)
 
     log.info(
-        "Daemon starting v%s — %d device(s): %s",
+        "Daemon starting v%s -- %d device(s): %s",
         _DAEMON_VERSION,
         len(devices),
         ", ".join(sorted(devices)),

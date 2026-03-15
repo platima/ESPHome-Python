@@ -7,7 +7,7 @@ native ESPHome API, designed as an
 [OpenClaw](https://github.com/openclaw/openclaw) skill for
 voice/chat-driven home automation.
 
-**Version:** 0.3.6
+**Version:** 0.3.7
 
 ## Overview
 
@@ -76,6 +76,7 @@ bash install.sh
 | Flag          | Effect                                                             |
 |---------------|--------------------------------------------------------------------|
 | *(none)*      | Interactive install; offers upgrade/repair if already installed    |
+| `--install`   | Same as no args (explicit install)                                 |
 | `--upgrade`   | Pull latest git changes, update scripts + packages, restart service. Re-executes itself after `git pull` so installer fixes take effect immediately. |
 | `--repair`    | Reinstall scripts, venv, and service; recreates venv if missing    |
 | `--fast`      | Non-interactive: accept all safe defaults, no prompts              |

@@ -42,14 +42,15 @@ FAST=0
 VERBOSE=0
 for arg in "$@"; do
     case "$arg" in
+        --install)   ;;  # explicit install (same as no args)
         --uninstall) UNINSTALL=1 ;;
         --upgrade)   UPGRADE=1 ;;
         --repair)    REPAIR=1 ;;
         --fast)      FAST=1 ;;
         --verbose)   VERBOSE=1 ;;
         -h|--help)
-            echo "Usage: bash install.sh [--uninstall | --upgrade | --repair] [--fast] [--verbose]"
-            echo "  (no args)    Install ESPHome Lights; offers upgrade/repair if already installed"
+            echo "Usage: bash install.sh [--install | --uninstall | --upgrade | --repair] [--fast] [--verbose]"
+            echo "  --install    Install ESPHome Lights (same as no args)"
             echo "  --upgrade    Pull latest changes, update scripts + packages, restart service"
             echo "  --repair     Reinstall scripts, venv, and service from current source"
             echo "  --uninstall  Remove ESPHome Lights from this system"
@@ -132,7 +133,7 @@ do_uninstall() {
         ok "Service stopped."
     fi
     if systemctl --user is-enabled "$SERVICE_NAME" > /dev/null 2>&1; then
-        systemctl --user disable "$SERVICE_NAME"
+        systemctl --user disable "$SERVICE_NAME" > /dev/null 2>&1
         ok "Service disabled."
     fi
 
@@ -872,6 +873,8 @@ echo "  esphome-lights --reload"
 echo "  (or: systemctl --user kill -s HUP $SERVICE_NAME)"
 echo
 info "To view daemon logs:  journalctl --user -u $SERVICE_NAME -f"
+info "Log file location:    ~/.local/share/esphome-lights/esphome-lightsd.log"
+info "  (override or disable via ESPHOME_LIGHTS_LOG_FILE in your config)"
 info "To upgrade:           bash install.sh --upgrade   (git pull + update)"
 info "To repair:            bash install.sh --repair    (full reinstall, no git pull)"
 echo

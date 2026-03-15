@@ -271,3 +271,18 @@ next session picks up from here.
 - [x] Added `--verbose` installer flag to restore full git/pip output
 - [x] `--verbose` preserved across re-exec (same as `--fast`)
 - [x] Update README.md, CLAUDE.md, TODO.md, VERSION → 0.3.6
+### Fix: uninstall polish + --install alias (v0.3.7)
+
+- [x] Silenced `systemctl --user disable` output ("Removed ..." line
+      was noisy in the uninstall flow)
+- [x] Added `--install` flag as explicit alias for the default (no args)
+      install behaviour
+- [x] Updated help text and README flags table
+- [x] Replaced remaining Unicode in daemon log messages (ellipsis, arrows,
+      em dashes) and Python CLI error messages with ASCII equivalents
+- [x] Updated test assertions to match new ASCII audit log format
+- [x] Fixed test_oserror_on_dir_creation creating d:\no_such_root on
+      Windows (now mocks os.makedirs instead of relying on unwritable path)
+- [x] Added log file location and config hint to installer post-install output
+- [x] Update README.md, CLAUDE.md, TODO.md, VERSION -> 0.3.7
+- [x] Update README.md, CLAUDE.md, TODO.md, VERSION -> 0.3.7

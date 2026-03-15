@@ -814,8 +814,12 @@ class TestConfigureLogging(unittest.TestCase):
 
     def test_oserror_on_dir_creation_logs_warning(self):
         """An OSError during dir creation emits a warning but does not raise."""
-        with patch.dict(os.environ, {"ESPHOME_LIGHTS_LOG_FILE": "/no_such_root/a/b.log"}, clear=False):
-            # This path is intentionally unwritable; just verify no exception propagates.
+        bad_path = "/no_such_root/a/b.log"
+        with patch.dict(os.environ, {"ESPHOME_LIGHTS_LOG_FILE": bad_path}, clear=False), \
+             patch("os.makedirs", side_effect=OSError("mocked permission error")):
+            # os.makedirs is mocked to always raise, so this test is
+            # platform-independent (on Windows the original path was
+            # writable, accidentally creating d:\no_such_root\).
             try:
                 daemon._configure_logging()
             except Exception as exc:  # noqa: BLE001
@@ -880,7 +884,7 @@ class TestCommandAuditLogging(unittest.TestCase):
                 {"cmd": "set", "device": "nonexistent", "action": "on"}
             ))
         self.assertTrue(
-            any("→ error:" in line for line in cm.output)
+            any("-> error:" in line for line in cm.output)
         )
 
     def test_reload_is_logged(self):
@@ -905,7 +909,7 @@ class TestCommandAuditLogging(unittest.TestCase):
         with self.assertLogs("esphome-lightsd", level="INFO") as cm:
             asyncio.run(self.server._dispatch({"cmd": "explode"}))
         self.assertTrue(
-            any("cmd=explode" in line and "→ error:" in line for line in cm.output)
+            any("cmd=explode" in line and "-> error:" in line for line in cm.output)
         )
 
 

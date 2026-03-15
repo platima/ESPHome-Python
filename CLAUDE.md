@@ -279,14 +279,14 @@ Ensure `ESPHOME_LIGHTS_*` env vars are available to the agent.
 
 ## Current State
 
-- **Version:** 0.3.6
+- **Version:** 0.3.7
 - **Status:** Shell CLI wrapper + daemon architecture. Control commands (on/off/brightness/rgb/ping/reload) achieve sub-10ms response times via socat/nc on ARM.
 - `install.sh` supports `--upgrade` (git pull + update scripts/packages + restart), `--repair` (full reinstall without git pull), and `--uninstall`. Detecting an existing install runs health checks (venv, service file, symlinks, aioesphomeapi import) and defaults to Repair if issues are found.
 - OpenClaw skill installer offers Global / per-agent workspace / custom path with multi-select; upgrade/repair refresh existing links silently.
 - The shell wrapper (`esphome-lights`) handles all control commands natively; delegates `--list`/`--status`/`--debug` to `esphome-lights.py`.
 - The Python CLI (`esphome-lights.py`) is retained for complex output formatting and as a universal fallback.
 - The daemon (`esphome-lightsd.py`) maintains persistent connections and serves commands via a Unix domain socket.
-- `install.sh` installs as a systemd user service (no sudo required), checks for config, and offers OpenClaw skill registration. Supports `--fast` (non-interactive) and `--uninstall` flags.
+- `install.sh` installs as a systemd user service (no sudo required), checks for config, and offers OpenClaw skill registration. Supports `--install`, `--fast` (non-interactive), `--verbose`, and `--uninstall` flags.
 - `--device all` broadcasts commands to every device at once.
 - 75 unit tests covering daemon handlers, socket protocol, entity resolution, state caching, client-daemon integration, all-device wildcard broadcast, file logging config, and command audit logging.
 
