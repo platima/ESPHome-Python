@@ -285,4 +285,12 @@ next session picks up from here.
       Windows (now mocks os.makedirs instead of relying on unwritable path)
 - [x] Added log file location and config hint to installer post-install output
 - [x] Update README.md, CLAUDE.md, TODO.md, VERSION -> 0.3.7
-- [x] Update README.md, CLAUDE.md, TODO.md, VERSION -> 0.3.7
+
+### Fix: missing newline in shell wrapper output (v0.3.8)
+
+- [x] `_result()` in the shell wrapper now uses `printf '%s\n'` instead of
+      `printf '%s'` -- fixes missing trailing newline on --ping, --reload,
+      --on, --off, --brightness, --rgb output
+- [x] Added `esphome-lights` (no extension) to `.gitattributes` for LF
+      enforcement
+- [x] Update README.md, CLAUDE.md, TODO.md, VERSION -> 0.3.8

@@ -128,7 +128,7 @@ _ok() {
 # Only used for commands whose result is a plain JSON string
 # (on/off/brightness/rgb/ping/reload), not nested objects.
 _result() {
-    printf '%s' "$1" | sed 's/.*"result":"\([^"]*\)".*/\1/'
+    printf '%s\n' "$1" | sed 's/.*"result":"\([^"]*\)".*/\1/'
 }
 
 # ---------------------------------------------------------------------------
