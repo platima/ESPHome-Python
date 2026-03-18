@@ -265,24 +265,38 @@ instructions). Key metadata fields:
 
 `install.sh` handles OpenClaw skill registration automatically via an
 interactive target selector. Multiple targets can be selected at once.
-To link manually:
+
+OpenClaw 2026.3.13+ rejects symlinks that resolve outside the skills root, so
+the installer copies the five skill files into a real directory instead of
+creating a symlink to `INSTALL_LIB`. Upgrade and repair runs automatically
+migrate any existing legacy symlink to a real directory.
+
+To register manually (copy, not symlink):
 
 ```bash
 # Global (all agents)
-ln -s /path/to/ESPHome-Lights ~/.openclaw/skills/esphome-lights
+mkdir -p ~/.openclaw/skills/esphome-lights
+cp esphome-lights esphome-lights.py esphome-lightsd.py SKILL.md VERSION \
+   ~/.openclaw/skills/esphome-lights/
+chmod +x ~/.openclaw/skills/esphome-lights/esphome-lights{,.py} \
+          ~/.openclaw/skills/esphome-lights/esphome-lightsd.py
 
-# Per-agent workspace
-ln -s /path/to/ESPHome-Lights ~/.openclaw/workspace-layla/skills/esphome-lights
+# Per-agent workspace (same pattern)
+mkdir -p ~/.openclaw/workspace-layla/skills/esphome-lights
+cp esphome-lights esphome-lights.py esphome-lightsd.py SKILL.md VERSION \
+   ~/.openclaw/workspace-layla/skills/esphome-lights/
+chmod +x ~/.openclaw/workspace-layla/skills/esphome-lights/esphome-lights{,.py} \
+          ~/.openclaw/workspace-layla/skills/esphome-lights/esphome-lightsd.py
 ```
 
 Ensure `ESPHOME_LIGHTS_*` env vars are available to the agent.
 
 ## Current State
 
-- **Version:** 0.3.8
+- **Version:** 0.3.9
 - **Status:** Shell CLI wrapper + daemon architecture. Control commands (on/off/brightness/rgb/ping/reload) achieve sub-10ms response times via socat/nc on ARM.
 - `install.sh` supports `--upgrade` (git pull + update scripts/packages + restart), `--repair` (full reinstall without git pull), and `--uninstall`. Detecting an existing install runs health checks (venv, service file, symlinks, aioesphomeapi import) and defaults to Repair if issues are found.
-- OpenClaw skill installer offers Global / per-agent workspace / custom path with multi-select; upgrade/repair refresh existing links silently.
+- OpenClaw skill installer copies skill files into a real directory (not a symlink) to comply with OpenClaw 2026.3.13+ security policy. Upgrade/repair automatically migrate legacy symlinks to real directories.
 - The shell wrapper (`esphome-lights`) handles all control commands natively; delegates `--list`/`--status`/`--debug` to `esphome-lights.py`.
 - The Python CLI (`esphome-lights.py`) is retained for complex output formatting and as a universal fallback.
 - The daemon (`esphome-lightsd.py`) maintains persistent connections and serves commands via a Unix domain socket.

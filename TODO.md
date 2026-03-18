@@ -294,3 +294,17 @@ next session picks up from here.
 - [x] Added `esphome-lights` (no extension) to `.gitattributes` for LF
       enforcement
 - [x] Update README.md, CLAUDE.md, TODO.md, VERSION -> 0.3.8
+
+### Fix: OpenClaw 2026.3.13 symlink security rejection (v0.3.9)
+
+- [x] Added `_copy_skill_files()` helper in install.sh that deploys a real
+      directory of the five skill files instead of a symlink to INSTALL_LIB
+- [x] All six `ln -sfn "$INSTALL_LIB"` call-sites in `_install_openclaw_skill()`
+      replaced with `_copy_skill_files` (refresh, fast, g, N, o paths)
+- [x] Upgrade/repair path detects and migrates any existing legacy symlink
+      to a real directory automatically
+- [x] `do_uninstall()` updated: guard changed from `-L` to `-L || -d`,
+      `rm -f` changed to `rm -rf` to handle real directories
+- [x] Updated CLAUDE.md installation section (manual copy instructions
+      instead of symlink)
+- [x] Update CLAUDE.md, TODO.md, VERSION -> 0.3.9

@@ -148,11 +148,11 @@ do_uninstall() {
     rm -f "$INSTALL_BIN/esphome-lights" "$INSTALL_BIN/esphome-lightsd"
     ok "Symlinks removed from $INSTALL_BIN."
 
-    # 5. Remove OpenClaw skill symlink (if present)
+    # 5. Remove OpenClaw skill directory or legacy symlink (if present)
     OPENCLAW_SKILL="$HOME/.openclaw/skills/esphome-lights"
-    if [[ -L "$OPENCLAW_SKILL" ]]; then
-        rm -f "$OPENCLAW_SKILL"
-        ok "OpenClaw skill symlink removed."
+    if [[ -L "$OPENCLAW_SKILL" || -d "$OPENCLAW_SKILL" ]]; then
+        rm -rf "$OPENCLAW_SKILL"
+        ok "OpenClaw skill removed."
     fi
 
     # 6. Optionally keep or remove the Python 3.11 venv
@@ -321,22 +321,41 @@ _start_service() {
 }
 
 # ---------------------------------------------------------------------------
-# OpenClaw skill installation helper
+# OpenClaw skill helpers
 # ---------------------------------------------------------------------------
 
-# Install (or refresh) skill symlinks across whichever OpenClaw targets the
+# Copy the five skill files into a target directory, replacing any existing
+# symlink or stale directory.  OpenClaw 2026.3.13+ enforces that nothing inside
+# the skills root resolves outside it, so we deploy a real directory of files
+# rather than a symlink to INSTALL_LIB.
+_copy_skill_files() {
+    local _dest="$1"
+    rm -rf "$_dest"
+    mkdir -p "$_dest"
+    cp "$INSTALL_LIB/esphome-lights"     "$_dest/"
+    cp "$INSTALL_LIB/esphome-lights.py"  "$_dest/"
+    cp "$INSTALL_LIB/esphome-lightsd.py" "$_dest/"
+    cp "$INSTALL_LIB/SKILL.md"           "$_dest/"
+    cp "$INSTALL_LIB/VERSION"            "$_dest/"
+    chmod +x "$_dest/esphome-lights" \
+             "$_dest/esphome-lights.py" \
+             "$_dest/esphome-lightsd.py"
+}
+
+# Install (or refresh) skill directories across whichever OpenClaw targets the
 # user selects.  Called from the main install path, do_upgrade, and do_repair.
 #
 # Behaviour:
-#   - If any skill links already exist (global or per-workspace), they are
-#     refreshed silently -- no prompt shown.  Covers upgrade/repair flows.
-#   - If no links exist, the user is offered a multi-select menu:
+#   - If any skill directories already exist (global or per-workspace), they
+#     are refreshed silently -- no prompt shown.  Covers upgrade/repair flows.
+#     Legacy symlinks are automatically migrated to real directories.
+#   - If no directories exist, the user is offered a multi-select menu:
 #       [g] Global  (~/.openclaw/skills/)         -- available to all agents
 #       [N] <name>  (~/.openclaw/workspace-<name>/skills/)  -- specific agent
 #       [o] Other   -- manual path entry
 #       [n] Skip
 #     Multiple choices are accepted (space- or comma-separated, e.g. "g 1 2").
-#   - In --fast mode with no existing links, defaults to global.
+#   - In --fast mode with no existing directories, defaults to global.
 _install_openclaw_skill() {
     local _oc_dir="$HOME/.openclaw"
     [[ -d "$_oc_dir" ]] || return 0
@@ -359,10 +378,12 @@ _install_openclaw_skill() {
     done
 
     if [[ ${#_existing[@]} -gt 0 ]]; then
-        # Refresh existing links without prompting (upgrade / repair path).
+        # Refresh existing skill directories without prompting (upgrade / repair path).
+        # Any legacy symlink is replaced with a real directory of files; OpenClaw
+        # 2026.3.13+ rejects symlinks that resolve outside the skills root.
         for _target_dir in "${_existing[@]}"; do
             mkdir -p "$_target_dir"
-            ln -sfn "$INSTALL_LIB" "$_target_dir/$_skill_name"
+            _copy_skill_files "$_target_dir/$_skill_name"
             ok "OpenClaw skill refreshed: ${_target_dir/#$HOME/~}/$_skill_name"
         done
         return 0
@@ -373,7 +394,7 @@ _install_openclaw_skill() {
 
     if [[ $FAST -eq 1 ]]; then
         mkdir -p "$_global_skills"
-        ln -sfn "$INSTALL_LIB" "$_global_skills/$_skill_name"
+        _copy_skill_files "$_global_skills/$_skill_name"
         ok "OpenClaw skill linked (global): ~/.openclaw/skills/$_skill_name"
         return 0
     fi
@@ -403,7 +424,7 @@ _install_openclaw_skill() {
         case "${_tok,,}" in
             g|global)
                 mkdir -p "$_global_skills"
-                ln -sfn "$INSTALL_LIB" "$_global_skills/$_skill_name"
+                _copy_skill_files "$_global_skills/$_skill_name"
                 ok "OpenClaw skill linked (global): ~/.openclaw/skills/$_skill_name"
                 ;;
             [1-9]*)
@@ -411,7 +432,7 @@ _install_openclaw_skill() {
                 if [[ "$_idx" -ge 0 ]] && [[ "$_idx" -lt "${#_workspaces[@]}" ]]; then
                     _ws_skills="${_workspaces[$_idx]}/skills"
                     mkdir -p "$_ws_skills"
-                    ln -sfn "$INSTALL_LIB" "$_ws_skills/$_skill_name"
+                    _copy_skill_files "$_ws_skills/$_skill_name"
                     ok "OpenClaw skill linked: ~/${_ws_skills#$HOME/}/$_skill_name"
                 else
                     warn "Invalid choice: $_tok (no workspace at that index)"
@@ -422,7 +443,7 @@ _install_openclaw_skill() {
                 _custom_dir="${_custom_dir/#\~/$HOME}"
                 if [[ -n "$_custom_dir" ]]; then
                     mkdir -p "$_custom_dir"
-                    ln -sfn "$INSTALL_LIB" "$_custom_dir/$_skill_name"
+                    _copy_skill_files "$_custom_dir/$_skill_name"
                     ok "OpenClaw skill linked: ${_custom_dir/#$HOME/~}/$_skill_name"
                 else
                     warn "No path entered -- skipped."
