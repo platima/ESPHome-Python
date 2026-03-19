@@ -105,20 +105,25 @@ esphome-lights --device <id|all> --on              # Turn on  (~10ms via socat)
 esphome-lights --device <id|all> --off             # Turn off (~10ms via socat)
 esphome-lights --device <id|all> --brightness N    # Set brightness (0-255)
 esphome-lights --device <id|all> --rgb r,g,b       # Set RGB colour
+esphome-lights --device <id|all> --color-temp N    # Set colour temperature (Kelvin)
+esphome-lights --device <id|all> --cwww C,W        # Set cold/warm white (0-255 each)
 esphome-lights --ping                              # Health check (daemon mode)
 esphome-lights --reload                            # Reload config without restart
 
 Flags:
+  --json               Output raw JSON (for --list and --status)
   --bg, --background   Fire and forget (return immediately)
   --debug              Wait for completion and show detailed results (delegates to Python)
 ```
 
 ## Entity Handling
 
-- Prefer `LightInfo` entities for brightness/RGB control.
+- Prefer `LightInfo` entities for brightness/RGB/colour-temperature/CW-WW control.
 - Fall back to `SwitchInfo` for simple on/off devices (smart plugs, etc.).
 - Always skip entities with `object_id == 'status_led'`.
-- Brightness and RGB commands return errors for switch-type entities.
+- Brightness, RGB, colour temperature, and CW/WW commands return errors for switch-type entities.
+- Colour temperature is stored internally in mireds (ESPHome API); the CLI accepts and displays Kelvin.
+- Cold/warm white channels are stored as 0-255 integers in the state cache.
 
 ## Conventions
 
@@ -206,6 +211,8 @@ Unix socket at `/tmp/esphome-lights.sock` (configurable via
 {"cmd": "set", "device": "living_room", "action": "on"}
 {"cmd": "set", "device": "living_room", "action": "brightness", "value": "128"}
 {"cmd": "set", "device": "living_room", "action": "rgb", "value": "255,0,0"}
+{"cmd": "set", "device": "living_room", "action": "color_temp", "value": "2700"}
+{"cmd": "set", "device": "living_room", "action": "cwww", "value": "180,60"}
 {"cmd": "ping"}
 {"cmd": "reload"}
 ```
@@ -293,16 +300,16 @@ Ensure `ESPHOME_LIGHTS_*` env vars are available to the agent.
 
 ## Current State
 
-- **Version:** 0.3.9
-- **Status:** Shell CLI wrapper + daemon architecture. Control commands (on/off/brightness/rgb/ping/reload) achieve sub-10ms response times via socat/nc on ARM.
+- **Version:** 0.4.0
+- **Status:** Shell CLI wrapper + daemon architecture. Control commands (on/off/brightness/rgb/color-temp/cwww/ping/reload) achieve sub-10ms response times via socat/nc on ARM.
 - `install.sh` supports `--upgrade` (git pull + update scripts/packages + restart), `--repair` (full reinstall without git pull), and `--uninstall`. Detecting an existing install runs health checks (venv, service file, symlinks, aioesphomeapi import) and defaults to Repair if issues are found.
 - OpenClaw skill installer copies skill files into a real directory (not a symlink) to comply with OpenClaw 2026.3.13+ security policy. Upgrade/repair automatically migrate legacy symlinks to real directories.
-- The shell wrapper (`esphome-lights`) handles all control commands natively; delegates `--list`/`--status`/`--debug` to `esphome-lights.py`.
+- The shell wrapper (`esphome-lights`) handles all control commands natively; delegates `--list`/`--status`/`--json`/`--debug` to `esphome-lights.py`.
 - The Python CLI (`esphome-lights.py`) is retained for complex output formatting and as a universal fallback.
 - The daemon (`esphome-lightsd.py`) maintains persistent connections and serves commands via a Unix domain socket.
 - `install.sh` installs as a systemd user service (no sudo required), checks for config, and offers OpenClaw skill registration. Supports `--install`, `--fast` (non-interactive), `--verbose`, and `--uninstall` flags.
 - `--device all` broadcasts commands to every device at once.
-- 75 unit tests covering daemon handlers, socket protocol, entity resolution, state caching, client-daemon integration, all-device wildcard broadcast, file logging config, and command audit logging.
+- 85 unit tests covering daemon handlers, socket protocol, entity resolution, state caching, client-daemon integration, all-device wildcard broadcast, file logging config, and command audit logging.
 
 ## Known Limitations
 

@@ -72,7 +72,8 @@ def _fake_switch_entity(key=2, object_id="relay"):
     return entity
 
 
-def _fake_light_state(key=1, state=True, brightness=0.5, r=1.0, g=0.0, b=0.0):
+def _fake_light_state(key=1, state=True, brightness=0.5, r=1.0, g=0.0, b=0.0,
+                      color_temperature=None, cold_white=None, warm_white=None):
     """Return a mock LightState."""
     st = MagicMock()
     st.__class__ = type("LightState", (), {})
@@ -83,6 +84,9 @@ def _fake_light_state(key=1, state=True, brightness=0.5, r=1.0, g=0.0, b=0.0):
     st.red = r
     st.green = g
     st.blue = b
+    st.color_temperature = color_temperature
+    st.cold_white = cold_white
+    st.warm_white = warm_white
     return st
 
 
@@ -305,6 +309,57 @@ class TestDeviceManagerSet(unittest.TestCase):
         self.assertFalse(result["ok"])
         self.assertIn("requires a value", result["error"].lower())
 
+    def test_set_color_temp_light(self):
+        mgr, client = self._connected_manager()
+        result = mgr.handle_set("living_room", "color_temp", "2700")
+        self.assertTrue(result["ok"])
+        self.assertIn("2700", result["result"])
+        client.light_command.assert_called_once_with(
+            1, color_temperature=1_000_000.0 / 2700
+        )
+
+    def test_set_color_temp_switch_rejected(self):
+        mgr, _ = self._connected_manager()
+        result = mgr.handle_set("bedroom", "color_temp", "2700")
+        self.assertFalse(result["ok"])
+        self.assertIn("switch", result["error"].lower())
+
+    def test_set_color_temp_invalid_value(self):
+        mgr, _ = self._connected_manager()
+        result = mgr.handle_set("living_room", "color_temp", "abc")
+        self.assertFalse(result["ok"])
+
+    def test_set_color_temp_missing_value(self):
+        mgr, _ = self._connected_manager()
+        result = mgr.handle_set("living_room", "color_temp")
+        self.assertFalse(result["ok"])
+        self.assertIn("requires a value", result["error"].lower())
+
+    def test_set_cwww_light(self):
+        mgr, client = self._connected_manager()
+        result = mgr.handle_set("living_room", "cwww", "200,50")
+        self.assertTrue(result["ok"])
+        client.light_command.assert_called_once_with(
+            1, cold_white=200 / 255.0, warm_white=50 / 255.0
+        )
+
+    def test_set_cwww_switch_rejected(self):
+        mgr, _ = self._connected_manager()
+        result = mgr.handle_set("bedroom", "cwww", "200,50")
+        self.assertFalse(result["ok"])
+        self.assertIn("switch", result["error"].lower())
+
+    def test_set_cwww_invalid_value(self):
+        mgr, _ = self._connected_manager()
+        result = mgr.handle_set("living_room", "cwww", "abc,def")
+        self.assertFalse(result["ok"])
+
+    def test_set_cwww_missing_value(self):
+        mgr, _ = self._connected_manager()
+        result = mgr.handle_set("living_room", "cwww")
+        self.assertFalse(result["ok"])
+        self.assertIn("requires a value", result["error"].lower())
+
     # -- wildcard 'all' -------------------------------------------------------
 
     def test_set_all_on(self):
@@ -390,6 +445,9 @@ class TestStateCache(unittest.TestCase):
         self.assertEqual(cached["state"], "ON")
         self.assertEqual(cached["brightness"], 128)
         self.assertEqual(cached["rgb"], "255,0,0")
+        self.assertIsNone(cached["color_temp"])
+        self.assertIsNone(cached["cold_white"])
+        self.assertIsNone(cached["warm_white"])
         self.assertEqual(cached["entity_type"], "light")
 
     def test_caches_switch_state(self):
@@ -401,6 +459,27 @@ class TestStateCache(unittest.TestCase):
         self.assertEqual(cached["state"], "OFF")
         self.assertIsNone(cached["brightness"])
         self.assertEqual(cached["entity_type"], "switch")
+
+    def test_caches_light_state_with_color_temp(self):
+        mgr = _make_manager()
+        mgr._entity_info = {"living_room": {"key": 1, "type": "light"}}
+        # color_temperature is in mireds; 370 mireds = 2702.7...K -> round to 2703
+        state = _fake_light_state(key=1, state=True, color_temperature=370.0)
+        mgr._handle_state("living_room", state)
+        cached = mgr._state_cache["living_room"]
+        self.assertEqual(cached["color_temp"], 2703)
+        self.assertIsNone(cached["cold_white"])
+        self.assertIsNone(cached["warm_white"])
+
+    def test_caches_light_state_with_cwww(self):
+        mgr = _make_manager()
+        mgr._entity_info = {"living_room": {"key": 1, "type": "light"}}
+        state = _fake_light_state(key=1, state=True, cold_white=0.8, warm_white=0.2)
+        mgr._handle_state("living_room", state)
+        cached = mgr._state_cache["living_room"]
+        self.assertIsNone(cached["color_temp"])
+        self.assertEqual(cached["cold_white"], 204)
+        self.assertEqual(cached["warm_white"], 51)
 
     def test_ignores_mismatched_key(self):
         mgr = _make_manager()

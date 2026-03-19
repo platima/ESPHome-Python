@@ -308,3 +308,22 @@ next session picks up from here.
 - [x] Updated CLAUDE.md installation section (manual copy instructions
       instead of symlink)
 - [x] Update CLAUDE.md, TODO.md, VERSION -> 0.3.9
+
+### Feat: CW/WW and colour temperature support (v0.4.0)
+
+- [x] Daemon `_handle_state()`: cache `color_temp` (Kelvin, converted from
+      mireds), `cold_white`, and `warm_white` (0-255) for LightState updates
+- [x] Daemon `handle_set()`: add `color_temp` action (Kelvin → mireds)
+      and `cwww` action (cold,warm 0-255 → 0.0-1.0 float pair)
+- [x] Both actions rejected with clear errors for switch-type entities
+- [x] Python CLI `esphome-lights.py`: add `--color-temp` and `--cwww` flags,
+      `--json` flag for raw JSON output on `--list`/`--status`
+- [x] `format_status()` extended to display color_temp (Kelvin with K suffix)
+      and cwww (cold,warm integers) for ON light entities
+- [x] Shell wrapper `esphome-lights`: add `--color-temp`, `--cwww`, `--json`
+      flag parsing; fix `--list`/`--status` delegation to pass `"$@"` so
+      `--json` is forwarded correctly
+- [x] 10 new unit tests: 8 handle_set tests (color_temp × 4, cwww × 4),
+      2 state cache tests; existing test updated with new field assertions
+- [x] README updated: symlink → copy for OpenClaw manual install
+- [x] Update README.md, CLAUDE.md, SKILL.md, TODO.md, VERSION → 0.4.0

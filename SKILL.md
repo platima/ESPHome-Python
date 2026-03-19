@@ -1,6 +1,6 @@
 ---
 name: esphome-lights
-description: Control ESPHome smart lights and switches on the local network - on/off, brightness, RGB colour, and status queries
+description: Control ESPHome smart lights and switches on the local network - on/off, brightness, RGB colour, colour temperature, cold/warm white (CW/WW), and status queries
 homepage: https://github.com/platima/ESPHome-Lights
 metadata:
   clawdbot:
@@ -100,7 +100,8 @@ bash $SKILL_DIR/esphome-lights --status
 ```
 
 Output: one line per device showing `location  ON/OFF  (entity-type)`. For lights
-that are ON, brightness (0-255) and RGB values are also shown.
+that are ON, brightness (0-255), RGB values, colour temperature (Kelvin), and
+cold/warm white channel values are shown where applicable.
 
 ### Turn a light/switch on
 
@@ -143,6 +144,24 @@ bash $SKILL_DIR/esphome-lights --device <device> --rgb <r>,<g>,<b>
 
 Only works for light entities. Returns an error for switch-type devices.
 
+### Set colour temperature (Kelvin)
+
+```bash
+bash $SKILL_DIR/esphome-lights --device <device> --color-temp <kelvin>
+```
+
+Typical values: 2700 (warm white), 4000 (neutral), 6500 (cool daylight).
+Only works for light entities that support colour temperature.
+
+### Set cold/warm white channels (CW/WW)
+
+```bash
+bash $SKILL_DIR/esphome-lights --device <device> --cwww <cold>,<warm>
+```
+
+Sets the cold white and warm white channels independently (0-255 each).
+Only works for CW/WW capable light entities.
+
 ### Health check (daemon mode)
 
 ```bash
@@ -169,6 +188,7 @@ were added, removed, or changed. Returns a summary such as
 - If a command fails, check `--list` output for valid device names.
 - Use `all` as the device name to broadcast `--on`/`--off` to every device.
 - Use `--debug` flag for detailed JSON output from the daemon.
+- Use `--json` flag with `--list` or `--status` for machine-readable JSON output.
 - Use `--bg` flag to fire and forget (return immediately without waiting).
 - **Do not call `esphome-lights.py` directly** — always use the shell wrapper
   (`esphome-lights`, no extension) for the fastest response times.

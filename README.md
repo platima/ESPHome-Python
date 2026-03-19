@@ -7,12 +7,12 @@ native ESPHome API, designed as an
 [OpenClaw](https://github.com/openclaw/openclaw) skill for
 voice/chat-driven home automation.
 
-**Version:** 0.3.8
+**Version:** 0.4.0
 
 ## Overview
 
-ESPHome Lights lets you turn lights on/off, set brightness, and set RGB
-colours from the command line. Devices are discovered from environment
+ESPHome Lights lets you turn lights on/off, set brightness, set RGB colour,
+colour temperature, and cold/warm white (CW/WW) from the command line. Devices are discovered from environment
 variables; no separate config files to manage.
 
 The project uses a **persistent daemon + shell CLI** architecture. The
@@ -188,6 +188,12 @@ esphome-lights --device living_room --brightness 128
 # Set RGB colour (r,g,b, each 0-255)
 esphome-lights --device living_room --rgb 255,0,0
 
+# Set colour temperature in Kelvin (2700 = warm white, 6500 = cool daylight)
+esphome-lights --device living_room --color-temp 2700
+
+# Set cold/warm white channels independently (0-255 each)
+esphome-lights --device living_room --cwww 200,80
+
 # Health check
 esphome-lights --ping
 
@@ -197,20 +203,25 @@ esphome-lights --reload
 
 ### Flags
 
-| Flag                   | Effect                                          |
-|------------------------|-------------------------------------------------|
-| `--device DEVICE`      | Device name to control, or `all` for every device |
-| `--bg`, `--background` | Fire and forget - return immediately            |
-| `--debug`              | Show full JSON response (overrides `--bg`)      |
+| Flag                   | Effect                                                        |
+|------------------------|---------------------------------------------------------------|
+| `--device DEVICE`      | Device name to control, or `all` for every device            |
+| `--color-temp K`       | Set colour temperature in Kelvin (light entities only)        |
+| `--cwww C,W`           | Set cold/warm white 0-255 each (CW/WW light entities only)   |
+| `--json`               | Output raw JSON for `--list` and `--status`                   |
+| `--bg`, `--background` | Fire and forget - return immediately                          |
+| `--debug`              | Show full JSON response (overrides `--bg`)                    |
 
 > `--set` is kept as a backward-compatible alias for `--device`.
 
 ## Entity Handling
 
-- Prefers **`LightInfo`** entities for brightness and RGB control.
+- Prefers **`LightInfo`** entities for brightness, RGB, colour temperature, and CW/WW control.
 - Falls back to **`SwitchInfo`** for simple on/off devices (smart plugs, etc.).
 - Always skips entities with `object_id == 'status_led'`.
-- Brightness and RGB commands return errors for switch-type entities.
+- Brightness, RGB, colour temperature, and CW/WW commands return errors for switch-type entities.
+- Colour temperature (`--color-temp`) accepts Kelvin; the daemon converts to mireds for the ESPHome API.
+- Cold/warm white (`--cwww`) sets the two white channels independently (0-255 each).
 
 ## Daemon Architecture
 
@@ -229,6 +240,8 @@ newline-delimited JSON.
 {"cmd": "set", "device": "all", "action": "on"}
 {"cmd": "set", "device": "living_room", "action": "brightness", "value": "128"}
 {"cmd": "set", "device": "living_room", "action": "rgb", "value": "255,0,0"}
+{"cmd": "set", "device": "living_room", "action": "color_temp", "value": "2700"}
+{"cmd": "set", "device": "living_room", "action": "cwww", "value": "180,60"}
 {"cmd": "ping"}
 {"cmd": "reload"}
 ```
@@ -351,10 +364,18 @@ interactive target selector. To link manually:
 
 ```bash
 # Global (available to all agents)
-ln -s /path/to/ESPHome-Lights ~/.openclaw/skills/esphome-lights
+mkdir -p ~/.openclaw/skills/esphome-lights
+cp esphome-lights esphome-lights.py esphome-lightsd.py SKILL.md VERSION \
+   ~/.openclaw/skills/esphome-lights/
+chmod +x ~/.openclaw/skills/esphome-lights/esphome-lights{,.py} \
+          ~/.openclaw/skills/esphome-lights/esphome-lightsd.py
 
-# Or per-agent workspace
-ln -s /path/to/ESPHome-Lights ~/.openclaw/workspace-layla/skills/esphome-lights
+# Or per-agent workspace (same pattern)
+mkdir -p ~/.openclaw/workspace-layla/skills/esphome-lights
+cp esphome-lights esphome-lights.py esphome-lightsd.py SKILL.md VERSION \
+   ~/.openclaw/workspace-layla/skills/esphome-lights/
+chmod +x ~/.openclaw/workspace-layla/skills/esphome-lights/esphome-lights{,.py} \
+          ~/.openclaw/workspace-layla/skills/esphome-lights/esphome-lightsd.py
 ```
 
 ### Automation Examples
@@ -384,13 +405,13 @@ simple with no heavy frameworks.
 python3 -m unittest discover -s tests -v
 ```
 
-75 tests covering daemon command handlers, socket protocol, entity resolution,
+85 tests covering daemon command handlers, socket protocol, entity resolution,
 state caching, client-daemon integration, all-device wildcard broadcast, file
 logging configuration, and command audit logging.
 
 > **Platform note:** Tests are developed and CI'd on Linux. 8 tests that
 > exercise Unix domain socket I/O show as ERRORs on Windows/macOS (Unix
-> sockets are not available). All 75 tests pass on Linux.
+> sockets are not available). All 85 tests pass on Linux.
 
 ## File Structure
 
@@ -402,7 +423,7 @@ ESPHome-Lights/
 ├── esphome-lightsd.py          # Daemon (persistent connections + socket)
 ├── esphome-lightsd.service     # systemd unit file (system-level reference)
 ├── tests/
-│   ├── test_daemon.py          # Daemon unit tests (63 tests)
+│   ├── test_daemon.py          # Daemon unit tests (73 tests)
 │   └── test_client.py          # Client unit + integration tests (12 tests)
 ├── SKILL.md                    # OpenClaw skill definition
 ├── CLAUDE.md                   # AI assistant context

@@ -14,6 +14,8 @@ Request examples:
   {"cmd": "set", "device": "living_room", "action": "on"}
   {"cmd": "set", "device": "living_room", "action": "brightness", "value": "128"}
   {"cmd": "set", "device": "living_room", "action": "rgb", "value": "255,0,0"}
+  {"cmd": "set", "device": "living_room", "action": "color_temp", "value": "2700"}
+  {"cmd": "set", "device": "living_room", "action": "cwww", "value": "180,60"}
   {"cmd": "ping"}
   {"cmd": "reload"}
 
@@ -316,6 +318,9 @@ class DeviceManager:
 
         cls = state.__class__.__name__
         if cls == "LightState" and state.key == entity["key"]:
+            _ct = getattr(state, "color_temperature", None)
+            _cw = getattr(state, "cold_white", None)
+            _ww = getattr(state, "warm_white", None)
             self._state_cache[name] = {
                 "state": "ON" if state.state else "OFF",
                 "brightness": round(state.brightness * 255) if state.brightness is not None else None,
@@ -324,6 +329,11 @@ class DeviceManager:
                     if state.red is not None
                     else None
                 ),
+                # colour temperature: converted from mireds to Kelvin for display
+                "color_temp": round(1_000_000 / _ct) if _ct else None,
+                # cold/warm white channels: stored as 0-255 integers
+                "cold_white": round(_cw * 255) if _cw is not None else None,
+                "warm_white": round(_ww * 255) if _ww is not None else None,
                 "entity_type": "light",
             }
         elif cls == "SwitchState" and state.key == entity["key"]:
@@ -473,6 +483,39 @@ class DeviceManager:
                 control_key, rgb=(r / 255.0, g / 255.0, b / 255.0)
             )
             return {"ok": True, "result": f"RGB set to ({r},{g},{b})"}
+
+        elif action == "color_temp":
+            if control_type == "switch":
+                return {"ok": False, "error": "Colour temperature not supported for switch entities"}
+            if value is None:
+                return {"ok": False, "error": "Colour temperature requires a value in Kelvin (e.g. 2700)"}
+            try:
+                kelvin = int(value)
+                if kelvin <= 0:
+                    raise ValueError()
+            except ValueError:
+                return {"ok": False, "error": f"Colour temperature must be a positive integer (Kelvin), got {value}"}
+            # ESPHome native API uses mireds; convert from Kelvin
+            client.light_command(control_key, color_temperature=1_000_000.0 / kelvin)
+            return {"ok": True, "result": f"Colour temperature set to {kelvin}K"}
+
+        elif action == "cwww":
+            if control_type == "switch":
+                return {"ok": False, "error": "CW/WW not supported for switch entities"}
+            if value is None:
+                return {"ok": False, "error": "CW/WW requires a value (cold,warm - each 0-255)"}
+            try:
+                cw, ww = map(int, value.split(","))
+                if not all(0 <= c <= 255 for c in [cw, ww]):
+                    raise ValueError()
+            except ValueError:
+                return {"ok": False, "error": f"CW/WW must be cold,warm (0-255 each), got {value}"}
+            client.light_command(
+                control_key,
+                cold_white=cw / 255.0,
+                warm_white=ww / 255.0,
+            )
+            return {"ok": True, "result": f"CW/WW set to ({cw},{ww})"}
 
         else:
             return {"ok": False, "error": f"Unknown action '{action}'"}

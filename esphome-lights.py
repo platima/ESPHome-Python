@@ -13,12 +13,15 @@ Usage:
   esphome-lights.py --device <id|all> --off              # Turn off
   esphome-lights.py --device <id|all> --brightness N     # Set brightness (0-255)
   esphome-lights.py --device <id|all> --rgb r,g,b        # Set RGB colour
+  esphome-lights.py --device <id|all> --color-temp N     # Set colour temperature (Kelvin)
+  esphome-lights.py --device <id|all> --cwww C,W         # Set cold/warm white (0-255 each)
   esphome-lights.py --ping                               # Daemon health check
   esphome-lights.py --reload                             # Reload daemon config
 
   Use 'all' as the device name to send a command to every device at once.
 
 Flags:
+  --json               Output raw JSON (for --list and --status)
   --bg, --background   Fire and forget (return immediately)
   --debug              Show full JSON response from daemon
 """
@@ -104,7 +107,7 @@ def format_status(result: dict):
         etype = info.get("entity_type") or "unknown"
         parts = [f"  {name:20} {state:4}  ({etype})"]
 
-        # Show brightness and RGB details for light entities
+        # Show all available detail fields for light entities that are ON
         if etype == "light" and state == "ON":
             brightness = info.get("brightness")
             if brightness is not None:
@@ -112,6 +115,13 @@ def format_status(result: dict):
             rgb = info.get("rgb")
             if rgb:
                 parts.append(f"  rgb:{rgb}")
+            color_temp = info.get("color_temp")
+            if color_temp:
+                parts.append(f"  color_temp:{color_temp}K")
+            cold_white = info.get("cold_white")
+            warm_white = info.get("warm_white")
+            if cold_white is not None and warm_white is not None and (cold_white > 0 or warm_white > 0):
+                parts.append(f"  cwww:{cold_white},{warm_white}")
 
         print("".join(parts))
 
@@ -134,6 +144,8 @@ def main():
     parser.add_argument("--off", action="store_true", help="Turn off")
     parser.add_argument("--brightness", type=str, help="Set brightness (0-255)")
     parser.add_argument("--rgb", type=str, help="Set RGB colour (r,g,b)")
+    parser.add_argument("--color-temp", type=str, dest="color_temp", help="Set colour temperature in Kelvin (e.g. 2700)")
+    parser.add_argument("--cwww", type=str, help="Set cold/warm white (cold,warm - each 0-255)")
     parser.add_argument("--ping", action="store_true", help="Daemon health check")
     parser.add_argument("--reload", action="store_true", help="Reload daemon configuration")
     parser.add_argument(
@@ -147,6 +159,11 @@ def main():
         action="store_true",
         help="Show full JSON response (overrides --bg)",
     )
+    parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Output raw JSON (for --list and --status)",
+    )
 
     args = parser.parse_args()
 
@@ -156,7 +173,10 @@ def main():
     if args.list:
         resp = send_command({"cmd": "list"})
         if resp and resp.get("ok"):
-            format_list(resp["result"])
+            if args.json:
+                print(json.dumps(resp["result"], indent=2))
+            else:
+                format_list(resp["result"])
         elif resp:
             print(f"Error: {resp.get('error', 'unknown error')}", file=sys.stderr)
             sys.exit(1)
@@ -164,7 +184,10 @@ def main():
     elif args.status:
         resp = send_command({"cmd": "status"})
         if resp and resp.get("ok"):
-            format_status(resp["result"])
+            if args.json:
+                print(json.dumps(resp["result"], indent=2))
+            else:
+                format_status(resp["result"])
         elif resp:
             print(f"Error: {resp.get('error', 'unknown error')}", file=sys.stderr)
             sys.exit(1)
@@ -206,9 +229,23 @@ def main():
                 "action": "rgb",
                 "value": args.rgb,
             }
+        elif args.color_temp:
+            request = {
+                "cmd": "set",
+                "device": device,
+                "action": "color_temp",
+                "value": args.color_temp,
+            }
+        elif args.cwww:
+            request = {
+                "cmd": "set",
+                "device": device,
+                "action": "cwww",
+                "value": args.cwww,
+            }
         else:
             print(
-                "Error: --device requires --on, --off, --brightness, or --rgb",
+                "Error: --device requires --on, --off, --brightness, --rgb, --color-temp, or --cwww",
                 file=sys.stderr,
             )
             sys.exit(1)

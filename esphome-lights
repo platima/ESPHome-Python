@@ -18,6 +18,8 @@
 #   esphome-lights --device <id|all> --off
 #   esphome-lights --device <id|all> --brightness N   (0-255)
 #   esphome-lights --device <id|all> --rgb r,g,b
+#   esphome-lights --device <id|all> --color-temp N   (Kelvin, e.g. 2700)
+#   esphome-lights --device <id|all> --cwww C,W       (cold,warm 0-255)
 #   esphome-lights --ping
 #   esphome-lights --reload
 #
@@ -113,11 +115,13 @@ _s.close()
 
 # Check whether the JSON response indicates success.
 # Prints the error message to stderr and returns 1 on failure.
+# Uses a space-tolerant pattern because json.dumps emits "ok": false
+# (with a space after the colon).
 _ok() {
     local resp="$1"
-    if [[ "$resp" == *'"ok":false'* ]]; then
+    if [[ "$resp" == *'"ok": false'* || "$resp" == *'"ok":false'* ]]; then
         local msg
-        msg="$(printf '%s' "$resp" | sed 's/.*"error":"\([^"]*\)".*/\1/')"
+        msg="$(printf '%s' "$resp" | sed 's/.*"error":[[:space:]]*"\([^"]*\)".*/\1/')"
         printf 'Error: %s\n' "$msg" >&2
         return 1
     fi
@@ -127,8 +131,9 @@ _ok() {
 # Extract the string "result" field from a success response.
 # Only used for commands whose result is a plain JSON string
 # (on/off/brightness/rgb/ping/reload), not nested objects.
+# Pattern uses [[:space:]]* to tolerate json.dumps spacing ("result": "...").
 _result() {
-    printf '%s\n' "$1" | sed 's/.*"result":"\([^"]*\)".*/\1/'
+    printf '%s\n' "$1" | sed 's/.*"result":[[:space:]]*"\([^"]*\)".*/\1/'
 }
 
 # ---------------------------------------------------------------------------
@@ -146,8 +151,8 @@ DEBUG=0
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --list|--status)
-            # Complex object output — delegate to Python formatter.
-            exec python3 "$(_py_script)" "$1"
+            # Complex object output (and --json flag) — delegate to Python formatter.
+            exec python3 "$(_py_script)" "$@"
             ;;
         --ping)
             RESP="$(_send '{"cmd":"ping"}')"
@@ -178,6 +183,22 @@ while [[ $# -gt 0 ]]; do
             VALUE="${1:-}"
             shift || true
             ;;
+        --color-temp)
+            shift
+            ACTION="color_temp"
+            VALUE="${1:-}"
+            shift || true
+            ;;
+        --cwww)
+            shift
+            ACTION="cwww"
+            VALUE="${1:-}"
+            shift || true
+            ;;
+        --json)
+            # JSON output requires Python formatting — delegate.
+            exec python3 "$(_py_script)" "$@"
+            ;;
         --bg|--background)
             BACKGROUND=1
             shift
@@ -200,7 +221,7 @@ done
 # ---------------------------------------------------------------------------
 
 [[ -n "$DEVICE" ]] || _die "No command given. Use --help for usage."
-[[ -n "$ACTION" ]] || _die "--device requires --on, --off, --brightness, or --rgb"
+[[ -n "$ACTION" ]] || _die "--device requires --on, --off, --brightness, --rgb, --color-temp, or --cwww"
 
 # Lowercase the device name to match the daemon's key format
 DEVICE="${DEVICE,,}"
